@@ -273,12 +273,26 @@
     transform-origin:right center;transform-style:preserve-3d;transform:rotateY(0deg);
   }
   .opening-leaf[data-cover-opening] {
-    animation:open-first-leaf var(--cover-duration) var(--cover-easing) both;
+    animation:open-first-leaf var(--cover-duration) var(--cover-easing) .95s both;
   }
   .opening-leaf > .volume-page {backface-visibility:hidden;transform:translateZ(0)}
-  .book-intro {transform:translateZ(-2px) rotateY(180deg);border-radius:3px 9px 9px 3px}
+  /* Com o índice ao lado, o texto pode tornar a folha muito mais alta que
+     a janela. Centralizamos a gravação na parte visível do couro, reservando
+     espaço para o cabeçalho, a cruz e o ornamento inferior. */
+  .book-intro {
+    transform:translateZ(-2px) rotateY(180deg);border-radius:3px 9px 9px 3px;
+    align-content:start;
+    grid-template-rows:min(100%,max(12rem,100svh - 15rem));
+  }
 }
 @keyframes open-first-leaf {from {transform:rotateY(180deg)} to {transform:rotateY(0deg)}}
+/* Com scripts ativos, a breve pausa de leitura só começa após a primeira
+   pintura em uma aba visível. Sem JavaScript, o CSS faz a abertura sozinho. */
+@media (scripting:enabled) and (width > 760px) {
+  .opening-leaf[data-cover-opening]:not([data-cover-visible]) {
+    animation-play-state:paused;
+  }
+}
 @media(max-width:760px) {
   /* Na edição de uma página, o capítulo já está impresso por baixo. Ao
      passar pela vertical, a capa sai pela margem esquerda, fora da folha. */

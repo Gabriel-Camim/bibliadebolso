@@ -9,8 +9,39 @@
 
   const hinge = reader.querySelector("[data-cover-opening]");
   if (hinge) {
+    function waitForImprint(imprint) {
+      // A Render pode entregar a página a uma aba em segundo plano. Começamos
+      // a contar o tempo para ler o título quando ele entra no campo de visão.
+      return new Promise(resolve => {
+        let inView = !("IntersectionObserver" in window);
+        const observer = inView ? null : new IntersectionObserver(([entry]) => {
+          inView = entry.isIntersecting;
+          check();
+        });
+        function check() {
+          if (hinge.isConnected && !smallScreen.matches && (document.hidden || !inView)) return;
+          observer?.disconnect();
+          document.removeEventListener("visibilitychange", check);
+          document.removeEventListener("bible:opened", check);
+          smallScreen.removeEventListener("change", check);
+          resolve();
+        }
+        document.addEventListener("visibilitychange", check);
+        document.addEventListener("bible:opened", check);
+        smallScreen.addEventListener("change", check);
+        observer?.observe(imprint);
+        check();
+      });
+    }
     async function waitForCover() {
       const cover = hinge.querySelector(".book-intro");
+      if (!smallScreen.matches) {
+        await waitForImprint(cover.querySelector(".cover-imprint"));
+        // Dois quadros dão ao navegador uma pintura da capa ainda fechada.
+        if (hinge.isConnected && !smallScreen.matches)
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
+      hinge.setAttribute("data-cover-visible", "");
       // No desktop a primeira folha gira junto com a capa. No celular gira
       // só o couro. Se a tela mudar durante a abertura, o CSS pode cancelar
       // uma animação e iniciar a outra; esperamos a que estiver em exibição.
