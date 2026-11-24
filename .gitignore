@@ -1,0 +1,9 @@
+# Credenciais, sessões, conversas e registros financeiros pertencem à instalação.
+.env
+.env.*
+!.env.example
+instance/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
