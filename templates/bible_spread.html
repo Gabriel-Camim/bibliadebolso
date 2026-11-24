@@ -29,21 +29,17 @@
         {{ turn_link(next_spread,true,'double') }}{{ turn_link(next_leaf,true,'single') }}
       </nav>
     </div>
-    <div class="volume-cover" id="livro" tabindex="-1" aria-label="Livro aberto em {{ books[book_code] }}, capítulo {{ chapter }}">
-      {% if open_cover %}
-      {# A capa decorativa gira sobre as folhas reais. A passagem por baixo
-         já pode receber foco, inclusive com JavaScript desativado. #}
-      <div class="book-intro" aria-hidden="true">
-        <div class="opening-board">
-          <div class="board-face">
-            <div class="cover-imprint"><i class="cover-cross"></i><span>Bíblia<br><em>Sagrada</em></span><i class="cover-flourish">✧</i></div>
-          </div>
-          <div class="board-lining"></div>
-        </div>
-      </div>
-      {% endif %}
+    <div class="volume-cover{% if open_cover %} hinged-volume{% endif %}" id="livro" tabindex="-1" aria-label="Livro aberto em {{ books[book_code] }}, capítulo {{ chapter }}">
       <div class="volume-sheets">
         {% for leaf, verses in spread %}
+          {% if open_cover and loop.first %}
+          {# A face interna da capa é a própria página de Gênesis. Os versos e
+             os links que giram sobre a lombada continuam aqui após a abertura. #}
+          <div class="opening-leaf" data-cover-opening>
+            <div class="book-intro" aria-hidden="true">
+              <div class="cover-imprint"><i class="cover-cross"></i><span>Bíblia<br><em>Sagrada</em></span><i class="cover-flourish">✧</i></div>
+            </div>
+          {% endif %}
           <article class="volume-page {{ 'verso' if loop.first else 'recto' }}{{ ' leaf-current' if leaf.number == current.number }}"
                    aria-label="Página {{ leaf.number }}, {{ books[leaf.book] }} {{ leaf.chapter }}" data-page-number="{{ leaf.number }}">
             <header class="volume-running"><span>{{ books[leaf.book] }}</span><span>{{ leaf.chapter }} · {{ leaf.first }}–{{ leaf.last }}</span></header>
@@ -79,10 +75,12 @@
             </ol>
             <footer class="volume-folio" aria-label="Página {{ folio(leaf.number) }}"><span>{{ folio(leaf.number) }}</span></footer>
           </article>
+          {% if open_cover and loop.first %}</div>{% endif %}
         {% endfor %}
         {% if spread|length == 1 %}<div class="volume-endpaper" aria-hidden="true">{{ icon('book',36) }}</div>{% endif %}
+        {% if open_cover %}<i aria-hidden="true" class="volume-ribbon"></i>{% endif %}
       </div>
-      <i aria-hidden="true" class="volume-ribbon"></i>
+      {% if not open_cover %}<i aria-hidden="true" class="volume-ribbon"></i>{% endif %}
     </div>
     <nav class="leaf-controls" aria-label="Virar páginas">
       <span class="volume-lamb" aria-hidden="true"><img alt="" src="{{ url_for('static',filename='personagens/ovelha-passo-1.png') }}"><img class="lamb-stride" alt="" src="{{ url_for('static',filename='personagens/ovelha-passo-2.png') }}"></span>

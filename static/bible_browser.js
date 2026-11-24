@@ -7,23 +7,25 @@
   const smallScreen = window.matchMedia("(max-width:760px)");
   let turning;
 
-  // A capa existe apenas na entrada principal da Bíblia. Removê-la após a
-  // animação libera a camada 3D e sinaliza ao tutorial que a leitura abriu.
-  const intro = reader.querySelector(".book-intro");
-  if (intro) {
-    let finished = false;
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      intro.remove();
+  const hinge = reader.querySelector("[data-cover-opening]");
+  if (hinge) {
+    async function waitForCover() {
+      const cover = hinge.querySelector(".book-intro");
+      // No desktop a primeira folha gira junto com a capa. No celular gira
+      // só o couro. Se a tela mudar durante a abertura, o CSS pode cancelar
+      // uma animação e iniciar a outra; esperamos a que estiver em exibição.
+      while (hinge.isConnected) {
+        const motion = [hinge, cover].flatMap(node => node.getAnimations())
+          .filter(animation => animation.playState !== "finished" && animation.playState !== "idle");
+        if (!motion.length) break;
+        await Promise.allSettled(motion.map(animation => animation.finished));
+      }
+      // Nem o toque para rolar nem um cronômetro cortam a rotação. A folha
+      // impressa conserva sua superfície depois de assentar na mesa.
+      hinge.removeAttribute("data-cover-opening");
       document.dispatchEvent(new Event("bible:cover-opened"));
-    };
-    intro.addEventListener("animationend", event => {if (event.target === intro) finish();});
-    // O foco que o índice ou o tutorial move por conta própria não encurta
-    // a abertura. Um gesto deliberado deixa a página disponível de imediato.
-    reader.addEventListener("pointerdown", event => {if (event.isTrusted) finish();}, {once:true});
-    reader.addEventListener("keydown", event => {if (event.isTrusted) finish();}, {once:true});
-    setTimeout(finish, 2400); // Também encerra se o navegador omitir animationend.
+    }
+    waitForCover();
   }
 
   // As duas faces em movimento são decorativas. A folha nova já pode receber

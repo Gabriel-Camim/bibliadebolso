@@ -155,18 +155,17 @@
     button.hidden = false;
     button.addEventListener("click", () => openTour(button));
   }
-  // Ao entrar pela aba Bíblia, a leitora vê a capa abrir antes do convite.
-  // O limite também funciona se o sistema reduzir a animação da encadernação.
+  // O sinal vem da dobradiça, inclusive quando a rotação muda ao redimensionar
+  // a tela. Voltar de outra aba também respeita a abertura ainda em curso.
   if (dialog.dataset.first === "1") {
     let pending = true;
     function begin() {
-      if (!pending || document.visibilityState === "hidden") return;
+      if (!pending || document.visibilityState === "hidden" || document.querySelector("[data-cover-opening]")) return;
       pending = false;
       if (!document.querySelector("dialog[open]")) openTour();
     }
-    if (document.querySelector(".book-intro")) {
+    if (document.querySelector("[data-cover-opening]")) {
       document.addEventListener("bible:cover-opened", begin, {once:true});
-      setTimeout(begin, 2700);
     } else requestAnimationFrame(begin);
     document.addEventListener("visibilitychange", () => { if (pending && !document.hidden) begin(); });
   }

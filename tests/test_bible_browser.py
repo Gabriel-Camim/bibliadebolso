@@ -18,19 +18,37 @@ class PrintedPages(HTMLParser):
         self.current = None
         self.links = {}
         self.ids = []
+        self.pages_on_hinge = []
+        self.covers_on_hinge = 0
+        self.div_depth = 0
+        self.hinge_depth = None
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == "div":
+            self.div_depth += 1
+            if "data-cover-opening" in attrs:
+                self.hinge_depth = self.div_depth
+            if self.hinge_depth is not None and attrs.get("class") == "book-intro":
+                self.covers_on_hinge += 1
         if "data-page-number" in attrs:
             number = int(attrs["data-page-number"])
             self.pages.append(number)
+            if self.hinge_depth is not None:
+                self.pages_on_hinge.append(number)
             if "leaf-current" in attrs["class"].split():
                 self.current = number
         if "data-book-turn" in attrs:
             self.links[attrs["class"].split()[-1], attrs["data-book-turn"]] = attrs["href"]
         if tag == "li" and "id" in attrs:
             self.ids.append(attrs["id"])
+
+    def handle_endtag(self, tag):
+        if tag == "div":
+            if self.div_depth == self.hinge_depth:
+                self.hinge_depth = None
+            self.div_depth -= 1
 
 
 class BibleBrowserFlow(TestCase):
@@ -78,6 +96,11 @@ class BibleBrowserFlow(TestCase):
         fragment = self.client.get("/biblia/GEN/1?abrir=1", headers={"X-Bible-Chapter":"GEN/1"})
         self.assertNotIn('class="book-intro"', fragment.get_data(as_text=True))
         printed = PrintedPages(first.get_data(as_text=True))
+        # A mesma dobradiça leva o couro e a página legível de Gênesis.
+        # Uma capa sobreposta que desaparece sobre uma página já aberta
+        # quebraria a continuidade justamente no fim da rotação.
+        self.assertEqual(printed.covers_on_hinge, 1)
+        self.assertEqual(printed.pages_on_hinge, [1])
         self.assertEqual(printed.pages, [1, 2])
         self.assertEqual(printed.current, 1)
         self.assertNotIn(("leaf-double", "previous"), printed.links)
