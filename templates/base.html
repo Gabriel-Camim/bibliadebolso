@@ -1,0 +1,57 @@
+{% from 'icons.html' import icon %}
+{# As duas versões do menu usam a mesma lista e a mesma indicação de página. #}
+{% macro nav_items() %}
+  <a href="/" {% if request.endpoint=='reader' %}aria-current="page"{% endif %}>Versículo</a>
+  <a href="{{ url_for('bible.index') }}" {% if request.blueprint=='bible' %}aria-current="page"{% endif %}>Bíblia</a>
+  <a href="/estudo" {% if request.blueprint=='study' or request.path=='/assinatura' %}aria-current="page"{% endif %}>Estudo guiado</a>
+  {% if g.user %}<a href="{{ url_for('library.index') }}" {% if request.blueprint=='library' %}aria-current="page"{% endif %}>Biblioteca</a>{% endif %}
+{% endmacro %}
+<!doctype html>
+<html lang="pt-BR" data-cookies="{{ session.get('cookie_choice', '') }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f2e8">
+  <meta name="description" content="Abra um versículo, leia no seu ritmo e estude o contexto bíblico.">
+  <title>{% block title %}bibliadebolso.com · Leitura bíblica{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static',filename='site.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static',filename='accounts.css') }}">
+  {% block head %}{% endblock %}
+  <script defer src="{{ url_for('static',filename='site.js') }}"></script>
+</head>
+<body data-view="{{ request.endpoint }}">
+  <a class="skip" href="#conteudo">Pular para o conteúdo</a>
+  <header class="masthead">
+    <div class="nav-shell">
+      <a href="/" class="brand" aria-label="bibliadebolso.com — início">
+        <span class="brand-mark">{{ icon('emblem',24) }}</span>
+        <span>bibliadebolso<span class="domain">.com</span></span>
+      </a>
+      <nav class="main-nav" aria-label="Principal">{{ nav_items() }}</nav>
+      <div class="nav-account">
+        <details class="mobile-nav"><summary aria-label="Menu do site">{{ icon('menu',19) }}<span>Menu</span></summary><nav aria-label="Menu do site">{{ nav_items() }}<a href="{{ url_for('bible.index', indice=1, _anchor='indice-biblico') }}" data-open-bible-index>Índice da Bíblia</a>{% if is_admin %}<a href="/admin">Administração</a>{% endif %}</nav></details>
+        {% if is_admin %}<a class="admin-shortcut" href="/admin">Admin</a>{% endif %}
+        <a class="entry" href="{{ '/conta' if g.user else '/entrar' }}">{{ icon('user',16) }} {{ 'Minha conta' if g.user else 'Entrar' }}</a>
+      </div>
+    </div>
+  </header>
+  <div id="site-toasts" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+  <main id="conteudo" class="main-shell">
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <p class="{{ 'toast-flash' if category=='toast' else 'notice' }}" role="status">{{ message }}</p>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-foot"><span>{{ icon('book',17) }} Bíblia de Bolso</span>
+    <nav aria-label="Rodapé"><a href="/sobre">Sobre a IA</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><button type="button" data-cookies-open>Cookies</button></nav>
+  </footer>
+  {# O aviso permanece no fluxo da página e não bloqueia a leitura do versículo. #}
+  <aside class="cookie-box" id="cookie-box" aria-label="Preferências de cookies" {% if session.get('cookie_choice') %}hidden{% endif %}>
+    <div><strong>Preferências de cookies</strong><p>Usamos cookies essenciais. Você também pode permitir que este navegador lembre suas preferências de fonte e tamanho. <a href="/privacidade">Privacidade</a></p></div>
+    <form method="post" action="/cookies"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="back" value="{{ request.path }}">
+      <button class="button secondary" name="choice" value="essential">Só essenciais</button>
+      <button class="button secondary" name="choice" value="preferences">Aceitar preferências</button>
+    </form>
+  </aside>
+  {% block scripts %}{% endblock %}
+</body></html>

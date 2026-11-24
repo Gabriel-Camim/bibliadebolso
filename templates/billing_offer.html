@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Estudo guiado · bibliadebolso.com{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='billing.css') }}">{% endblock %}
+{% block content %}
+{# Esta página acolhe quem chegou do leitor. A referência segue na entrada
+   com Google e na sessão de pagamento para poder voltar ao mesmo versículo. #}
+<section class="billing-page offer-page">
+  <div class="billing-hero">
+    <div>
+      <a class="billing-back" href="{{ url_for('bible.locate', verse_id=verse_id) if verse_id else url_for('reader') }}">{{ icon('book',15) }} Voltar à leitura</a>
+      <h1>{{ offer.title }}</h1>
+      <p>{{ offer.description }}</p>
+      <p class="billing-fine">Um assistente de IA para ler a passagem no contexto do capítulo, comparar trechos e explorar suas dúvidas.</p>
+      {% if ready and not live %}<p class="billing-status"><strong>Ambiente de teste.</strong> Os pagamentos são simulados.</p>{% endif %}
+      {% if manageable %}
+        <form method="post" action="{{ url_for('billing.portal') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="order" value="{{ manageable.id }}">
+          <button class="button primary">Gerenciar assinatura</button>
+        </form>
+      {% elif offer.published and ready %}
+        <p class="billing-price">{{ offer.price_cents|brl }} <small>por mês</small></p>
+        <p class="billing-fine">Cobrança mensal recorrente no cartão. Você pode cancelar em Minha conta.</p>
+        {% if g.user %}
+          <form method="post" action="{{ url_for('billing.checkout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="revision" value="{{ offer.revision }}">
+            <input type="hidden" name="offer_mode" value="{{ 'live' if live else 'test' }}">
+            {% if verse_id %}<input type="hidden" name="verse_id" value="{{ verse_id }}">{% endif %}
+            <button class="button primary">Assinar estudo guiado</button>
+          </form>
+        {% else %}
+          <a class="button primary" href="{{ url_for('accounts.login', next=url_for('billing.offer', verse_id=verse_id)) }}">Entrar para assinar</a>
+        {% endif %}
+      {% else %}
+        <p class="billing-status">As assinaturas estão em preparação. A leitura de versículos está disponível gratuitamente.</p>
+        <a class="button secondary" href="/">Continuar a leitura</a>
+      {% endif %}
+    </div>
+    <aside class="offer-example" aria-label="Exemplo de conversa com o guia de estudos">
+      <div class="example-land"><img src="/static/personagens/jesus-ensina.png" alt=""><img class="example-lamb" src="/static/personagens/ovelha-passo-2.png" alt=""></div>
+      <div class="example-chat">
+        <p class="example-heading">{{ icon('spark',16) }} Conversa de exemplo</p>
+        <p class="example-question">Por que o Salmo 23 chama Deus de pastor?</p>
+        <h2>A imagem do pastor</h2>
+        <p>Nos primeiros versos, o pastor conduz o rebanho ao alimento, à água e ao descanso. No vale escuro, a confiança de quem fala vem da presença de quem o acompanha.</p>
+        <a href="{{ url_for('bible.index', livro='PSA', capitulo=23, versiculo=1) }}">{{ icon('book',15) }} Ler o Salmo 23</a>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

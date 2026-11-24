@@ -1,0 +1,38 @@
+{# Uma árvore progressiva. A primeira resposta traz todos os livros e o ramo
+   em leitura. Os outros ramos ganham links à medida que são abertos. #}
+<aside class="bible-index" id="indice-biblico" tabindex="-1" aria-label="Explorar a Bíblia">
+  <div class="index-title"><span>{{ icon('book',20) }} Explorar</span><a href="#livro" data-index-close aria-label="Fechar índice">{{ icon('close',19) }}</a></div>
+  <div class="index-tabs" aria-label="Seções do índice">
+    <button type="button" id="index-books-tab" data-index-tab="books" aria-controls="bible-index-books" aria-pressed="true">{{ icon('book',15) }} Livros</button>
+    <button type="button" id="index-notes-tab" data-index-tab="notes" aria-controls="bible-index-notes" aria-pressed="false">{{ icon('bookmark',15) }} Marca-páginas</button>
+  </div>
+  <section id="bible-index-books" aria-labelledby="index-books-tab">
+    {% include 'bible_jump.html' %}
+    <nav class="bible-tree" aria-label="Livros, capítulos e versículos" data-number-url="{{ number_url }}">
+        {% for code,name in books.items() if by_book[code] %}
+          {% if code in ['GEN','MAT'] %}<h2 class="tree-division">{{ 'Antigo Testamento' if code=='GEN' else 'Novo Testamento' }}</h2>{% endif %}
+          <details class="tree-book" data-tree-book="{{ code }}" data-book-name="{{ name }}" data-chapters="{{ by_book[code]|join(',') }}" data-chapter-url="{{ url_for('bible.chapter', book_code=code, chapter=999) }}"{% if code == book_code %} open{% endif %}>
+            <summary><span class="branch-caret" aria-hidden="true">›</span>{{ icon('book',15) }} <span>{{ name }}</span></summary>
+            <div class="tree-chapters">
+              {% if code==book_code %}{% for n in by_book[code] %}
+                <details class="tree-chapter" data-chapter="{{ n }}"{% if n==chapter %} open{% endif %}>
+                  <summary><span class="branch-caret" aria-hidden="true">›</span> Capítulo {{ n }}</summary>
+                  {% if n==chapter %}
+                    <div class="tree-passages">
+                      <a class="chapter-entry" href="{{ url_for('bible.chapter',book_code=code,chapter=n) }}" data-tree-go>Abrir capítulo <span aria-hidden="true">↗</span></a>
+                      <div class="verse-grid">{% for v in numbers %}<a data-tree-go href="{{ verse_url(code,n,v.number) }}" aria-label="{{ name }} {{ n }}:{{ v.label }}"{% if selected and selected.start_verse==v.number %} aria-current="location"{% endif %}>{{ v.label }}</a>{% endfor %}</div>
+                    </div>
+                  {% endif %}
+                </details>
+              {% endfor %}{% endif %}
+              <noscript><a href="{{ url_for('bible.chapter',book_code=code,chapter=by_book[code][0]) }}">Abrir {{ name }}</a>{% if code==book_code %}{% for n in by_book[code] %} <a href="{{ url_for('bible.chapter',book_code=code,chapter=n) }}">{{ n }}</a>{% endfor %}{% endif %}</noscript>
+            </div>
+          </details>
+        {% endfor %}
+    </nav>
+  </section>
+  <section id="bible-index-notes" aria-labelledby="index-notes-tab" hidden>
+    {% include 'bible_notes_tree.html' %}
+  </section>
+</aside>
+<a href="#livro" data-index-close class="index-scrim" aria-label="Fechar índice"></a>

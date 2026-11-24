@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% from 'study_parts.html' import glyph, row, sources, assistant_label with context %}
+{% block title %}{{ verse.reference }} · Estudo guiado · bibliadebolso.com{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='study.css') }}">{% endblock %}
+{% block content %}
+<article class="chat-desk" data-chat-workspace data-current="{{ chat.id if chat else '' }}"
+         data-fresh="{{ url_for('study.start', verse_id=verse.id) }}" data-history="{{ url_for('study.history') }}"
+         data-delete-pattern="{{ url_for('study.delete_chat', chat_id=0) }}" data-reference="{{ verse.reference }}">
+  <aside class="chat-rail" id="chat-rail" aria-labelledby="threads-title">
+    <div class="rail-topline"><span class="rail-emblem">{{ glyph('passage',19) }}</span><span>Caderno de estudos</span>
+      <button class="rail-close" type="button" aria-label="Fechar conversas" data-close-menu>{{ glyph('close',19) }}</button>
+    </div>
+    <h2 id="threads-title">Conversas</h2>
+    <a class="new-thread" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ glyph('plus',16) }} Nova conversa</a>
+    <nav class="thread-nav" aria-label="Conversas salvas">
+      <ul class="thread-list" data-thread-list>
+        {% for item in chats %}{{ row(item, chat.id if chat else none) }}{% endfor %}
+      </ul>
+      <p class="empty-threads" data-empty-threads {% if chats %}hidden{% endif %}>Seus estudos aparecerão aqui após a primeira resposta.</p>
+    </nav>
+    <a class="rail-history" href="{{ url_for('study.history') }}">{{ glyph('history',17) }} Histórico e privacidade</a>
+  </aside>
+  <button type="button" class="chat-scrim" aria-label="Fechar conversas" data-close-menu hidden></button>
+  <section class="chat-main" aria-label="Conversa com o guia">
+    <header class="chat-bar">
+      <button class="chat-hamburger" type="button" aria-label="Abrir conversas" aria-controls="chat-rail" aria-expanded="false">{{ glyph('menu',21) }}</button>
+      <div class="chat-guide-mark" aria-hidden="true"><img id="guide-face" src="/static/personagens/jesus-acolhe.png" alt=""></div>
+      <div class="chat-name"><h1>Guia de estudos</h1><span>Assistente de IA</span></div>
+      <a class="bar-bible" href="{{ url_for('bible.locate', verse_id=verse.id) }}">{{ glyph('passage',17) }} <span>Abrir Bíblia</span></a>
+      <noscript><a href="{{ url_for('study.history') }}">Conversas</a></noscript>
+    </header>
+    <div class="chat-scrollport" id="chat-scrollport" tabindex="0" aria-label="Mensagens e passagem de origem">
+      <div class="chat-column">
+        <details class="passage-disclosure"{% if not turns %} open{% endif %}>
+        <summary>{{ glyph('passage',16) }} Passagem em estudo <strong>{{ verse.reference }}</strong><span aria-hidden="true">⌄</span></summary>
+        <section class="chapter-card" aria-label="Passagem em estudo">
+          <div class="chapter-scene" aria-hidden="true">
+            <img class="study-cloud" src="/static/personagens/nuvem-creme.png" alt="">
+            <img class="study-shepherd" src="/static/personagens/jesus-le.png" alt="">
+            <img class="study-lamb" src="/static/personagens/ovelha-passo-1.png" alt="">
+          </div>
+          <div class="chapter-copy">
+            <p class="chapter-edition">{{ glyph('passage',15) }} Passagem em estudo</p>
+            <h2>{{ verse.reference }}</h2><blockquote>{{ verse.text }}</blockquote>
+            <a href="{{ url_for('bible.locate', verse_id=verse.id) }}">Ler o capítulo {{ glyph('external',13) }}</a>
+          </div>
+        </section>
+        </details>
+        {% if active %}
+        <div class="chat-prompts" id="chat-prompts" {% if turns %}hidden{% endif %}>
+          <p>Por onde começar?</p>
+          <button type="button" data-prompt="Qual é o contexto histórico de {{ verse.reference }}?">Contexto histórico {{ glyph('external',12) }}</button>
+          <button type="button" data-prompt="Quais outras passagens dialogam com {{ verse.reference }}?">Passagens relacionadas {{ glyph('external',12) }}</button>
+        </div>
+        {% endif %}
+        <div id="chat-transcript">
+          {% for turn in turns %}
+          <section class="chat-turn">
+            <div class="reader-bubble"><span class="visually-concealed">Você escreveu</span><p>{{ turn.question }}</p></div>
+            <div class="assistant-reply">{{ assistant_label() }}<div class="chat-prose">{{ turn.answer|study_markdown }}</div>{{ sources(turn.sources) }}</div>
+          </section>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="compose-dock">
+      {% if active %}
+      <form method="post" action="{{ url_for('study.send') }}" id="study-form" class="chat-composer">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="token" value="{{ token }}">
+        <input type="hidden" name="verse_id" value="{{ verse.id }}"><input type="hidden" name="chat_id" value="{{ chat.id if chat else '' }}">
+        {% if not consented %}
+        <label class="chat-consent"><input type="checkbox" name="consent" required>
+          <span>Autorizo salvar a conversa e enviar minhas perguntas, o contexto e as passagens à OpenAI. As mensagens podem revelar convicções religiosas. Posso revogar o aceite e apagar o histórico. <a href="/privacidade">Privacidade</a></span>
+        </label>
+        {% endif %}
+        <p class="chat-error" id="chat-error" role="alert" {% if not error %}hidden{% endif %}>{{ error or '' }}</p>
+        <div class="compose-box">
+          <label class="visually-concealed" for="question">Sua mensagem para o guia de estudos</label>
+          <textarea id="question" name="question" rows="2" maxlength="3000" required placeholder="Pergunte sobre a passagem…">{{ draft }}</textarea>
+          <button class="chat-send" type="submit" aria-label="Enviar pergunta" title="Enviar pergunta">{{ glyph('send',20) }}</button>
+        </div>
+      </form>
+      {% else %}<p class="expired-chat">Você pode reler as mensagens salvas. <a href="{{ url_for('billing.offer', verse_id=verse.id) }}">Ver assinatura para conversar</a>.</p>{% endif %}
+      <p class="guide-disclosure"><span id="study-status" role="status"></span><a href="/sobre">A IA pode errar. Confira as passagens.</a></p>
+    </div>
+  </section>
+  <template id="pending-turn">
+    <section class="chat-turn"><div class="reader-bubble"><span class="visually-concealed">Você escreveu</span><p></p></div>
+      <div class="assistant-reply">{{ assistant_label() }}<div class="chat-prose"></div>
+        <span class="waiting-ink" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+    </section>
+  </template>
+  <template id="new-thread-row">{{ row(none) }}</template>
+</article>
+{% endblock %}
+{% block scripts %}<script defer src="{{ url_for('static', filename='study.js') }}"></script>{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% set titles={'sobre':'Sobre o estudo com IA','privacidade':'Política de privacidade','termos':'Termos de uso'} %}
+{# O controlador informa um e-mail ou URL de atendimento no servidor. Só
+   criamos links com HTTPS ou mailto. Outros formatos aparecem como texto. #}
+{% macro contact() -%}
+  {% set channel = config.get('PRIVACY_CONTACT', '')|trim %}
+  {% if channel.startswith('https://') %}
+    <a href="{{ channel }}">Abrir o canal de atendimento</a>
+  {% elif '@' in channel and ':' not in channel and '/' not in channel and '?' not in channel and '#' not in channel %}
+    <a href="mailto:{{ channel }}">{{ channel }}</a>
+  {% elif channel %}{{ channel }}
+  {% else %}O canal de atendimento aguarda configuração pelo responsável pelo site.{% endif %}
+{%- endmacro %}
+{% block title %}{{ titles[page] }} · bibliadebolso.com{% endblock %}
+{% block content %}
+<article class="legal">
+  <p class="eyebrow">{{ icon('book',16) }} BÍBLIA DE BOLSO</p>
+  <h1>{{ titles[page] }}</h1>
+{% if page == 'sobre' %}
+  <p>A Bíblia de Bolso é uma plataforma interativa de estudos bíblicos. O personagem ilustrado de Jesus acompanha a leitura. As explicações do chat são produzidas por inteligência artificial.</p>
+  <h2>Leia o trecho no contexto</h2>
+  <p>A IA pode errar uma referência, interpretar mal uma passagem ou apresentar uma leitura teológica como se fosse consenso. Questione a resposta, confira o versículo e leia os trechos antes e depois dele.</p>
+  <p>Você pode pedir ao agente que indique quais palavras da passagem sustentam uma interpretação e onde tradições cristãs divergem. Para orientação pessoal ou pastoral, converse com alguém de sua confiança.</p>
+  <h2>A edição bíblica</h2>
+  <p>Usamos a Bíblia Portuguesa Mundial (BPM), em domínio público. O editor descreve esta tradução como um rascunho em revisão. <a href="https://ebible.org/details.php?id=porbrbsl">Consultar a edição no eBible.org</a>.</p>
+{% elif page == 'privacidade' %}
+  <p>{{ config.CONTROLLER_NAME or 'Bíblia de Bolso' }} é responsável pelo tratamento dos dados desta plataforma. Você pode ler e sortear versículos sem cadastro.</p>
+  <h2>Conta e leitura</h2>
+  {% if config.DATABASE_BACKEND == 'turso' %}<p>Esta versão usa a Render para servir as páginas e o Turso para armazenar as contas, favoritos, anotações, conversas e registros de cobrança.</p>{% endif %}
+  <p>Você pode criar uma conta com nome de usuário, e-mail e senha. Guardamos um resumo criptográfico da senha com sal individual para verificar as entradas. Também registramos temporariamente identificadores protegidos de tentativas de acesso para limitar abusos.</p>
+  <p>Se escolher o Google ou o Facebook, recebemos o identificador do provedor, o nome e o e-mail compartilhado. No Facebook, o e-mail é opcional. Cada forma de cadastro cria um perfil independente. Para acessar suas anotações ou sua assinatura, volte pela mesma forma de entrada. O cadastro registra a data e a versão dos documentos aceitos.</p>
+  <p>O painel do proprietário mostra o nome, e-mail, data de cadastro e situação de acesso dos usuários. As métricas somam as aberturas do leitor e os versículos gerados por dia. O total histórico de cadastros também é agregado.</p>
+  <p>O cookie essencial de sessão mantém a autenticação, protege formulários, registra sua escolha de cookies e lembra o identificador do último versículo. Com sua permissão, o armazenamento local do navegador também guarda o tamanho e a fonte da leitura. A opção “Só essenciais” no controle “Cookies” do rodapé revoga essa preferência.</p>
+  <p>Se você favoritar um versículo depois de entrar, a biblioteca guarda a referência e a data em seu perfil privado. Para os favoritos de um sorteio, ela também mostra quando o versículo foi gerado. Em “Histórico”, você pode autorizar o registro dos próximos sorteios e das passagens que abrir. A desativação apaga esse histórico. Você pode retirar favoritos individualmente. A exclusão da conta apaga ambos.</p>
+  <p>Os marca-páginas guardam a referência bíblica, a cor escolhida, o título e o texto que você escrever. Essas anotações podem revelar convicções religiosas. Elas ficam no seu perfil. Você pode consultá-las, editá-las ou apagá-las no índice da Bíblia. A exclusão da conta também remove suas anotações.</p>
+  <h2>Estudos privados</h2>
+  <p>Perguntas de estudo podem revelar convicções religiosas, um dado sensível. O chat solicita seu consentimento específico antes de enviar a primeira pergunta. Para gerar cada resposta, compartilhamos com a OpenAI a pergunta atual, trechos bíblicos e até doze pares recentes de perguntas e respostas da mesma conversa, com limite de 32 mil caracteres de histórico. As mensagens são enviadas sem campos de nome ou e-mail do cadastro. Evite incluir dados pessoais no texto que escrever.</p>
+  <p>O histórico fica vinculado à sua conta até você apagar a conversa ou a conta. A exclusão remove do banco do site as mensagens e o contexto associados. A OpenAI pode manter registros do uso da API para monitorar abusos, normalmente por até 30 dias, com exceções de segurança ou exigência legal. <a href="https://developers.openai.com/api/docs/guides/your-data">Consulte os controles de dados da API</a>.</p>
+  <p>Mesmo depois que a assinatura termina, você pode abrir <a href="/estudo/historico">seu histórico de estudos</a> para consultar ou apagar uma conversa. Ao revogar o consentimento no histórico, o site exclui todas as suas conversas e o contexto local. Um novo envio depende de novo consentimento.</p>
+  <h2>Assinatura e pagamentos</h2>
+  <p>Você informa os dados de pagamento no checkout hospedado pela Stripe. Para executar o contrato e conciliar as operações, o site registra identificadores de cliente, pedido, assinatura e fatura, valores, datas, situação de pagamento, estornos e contestações. O pedido local lembra o versículo de origem para você retomar o estudo após a compra. A Stripe recebe um identificador aleatório do pedido para devolver você ao site. Ao excluir a conta, apagamos do pedido a referência bíblica e o vínculo com o cadastro local. As faturas e os identificadores de operação permanecem no histórico financeiro.</p>
+  <p>Google, Meta, OpenAI e Stripe podem processar dados fora do Brasil. O prazo dos registros técnicos desses fornecedores segue a finalidade e as condições de cada serviço. Você pode pedir ao responsável informações sobre transferências, registros financeiros e períodos de retenção aplicáveis à sua conta.</p>
+  <h2 id="contato">Seus direitos e contato</h2>
+  <p>Em <a href="/conta">Minha conta</a>, consulte seu cadastro ou peça a exclusão. Para solicitar confirmação de tratamento, acesso, correção, informações de compartilhamento, portabilidade quando aplicável, eliminação ou revogação do consentimento, fale com o responsável. Para iniciar o atendimento, informe o e-mail do cadastro e o que deseja solicitar.</p>
+  <p>{{ contact() }}</p>
+  <p>Se precisar apresentar uma petição, consulte as <a href="https://www.gov.br/anpd/pt-br/assuntos/titular-de-dados">orientações da ANPD para titulares</a>.</p>
+{% else %}
+  <p>A leitura de versículos é gratuita. Para enviar perguntas ao estudo guiado, é preciso entrar na sua conta, contratar a assinatura e autorizar o processamento das mensagens. O valor mensal em reais e as condições da oferta aparecem antes da confirmação da compra. O acesso pago é liberado após o site receber a confirmação do pagamento pela Stripe.</p>
+  <h2>Renovação e cancelamento</h2>
+  <p>A assinatura se renova mensalmente no cartão. Acesse <a href="/conta">Minha conta</a> e abra “Gerenciar cobranças” para consultar as faturas ou cancelar a assinatura. Confira no portal a data em que o cancelamento entra em vigor. A exclusão do cadastro fica disponível quando a assinatura estiver encerrada e os checkouts pendentes tiverem expirado.</p>
+  <h2>Atendimento e arrependimento</h2>
+  <p>Nas contratações online abrangidas pelo Código de Defesa do Consumidor, você pode exercer o direito de arrependimento em até sete dias, contados da assinatura ou do recebimento do serviço, conforme o caso. Para solicitar a devolução dos valores pagos nesse prazo ou tratar de uma cobrança, informe o e-mail do cadastro ao responsável. <a href="https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm#art49">Art. 49 do Código de Defesa do Consumidor</a>.</p>
+  <p>{{ contact() }}</p>
+  <h2>Uso do assistente</h2>
+  <p>A plataforma oferece apoio ao estudo bíblico. Confira as citações e as interpretações no texto original da leitura. <a href="/sobre">Entenda como usar as respostas da IA</a>.</p>
+  <p>Use sua própria conta, respeite a privacidade de outras pessoas e consulte a <a href="/privacidade">política de privacidade</a> para entender o tratamento dos seus dados.</p>
+{% endif %}
+</article>
+{% endblock %}

@@ -1,0 +1,93 @@
+/* A tinta pertence ao conteúdo do verso, inclusive quando a capitular e o
+   restante da palavra estão em nós diferentes. Mantemos os números limpos. */
+[data-tone="gold"] { --note-ink:#eed28b; }
+[data-tone="sage"] { --note-ink:#bfd1ab; }
+[data-tone="rose"] { --note-ink:#e8babe; }
+[data-tone="blue"] { --note-ink:#b6cedb; }
+[data-tone="none"] { --note-ink:#fbf8ed; }
+.scripture-verses .note-ink {
+  color:inherit; background:linear-gradient(179deg,transparent 12%,var(--note-ink) 16% 86%,transparent 92%);
+  box-decoration-break:clone; -webkit-box-decoration-break:clone; border-radius:2px;
+}
+.scripture-verses .note-ink[data-overlap] { text-decoration:underline dotted #71644b; text-underline-offset:.12em; }
+.scripture-verses [data-note-book]::selection,.scripture-verses [data-note-book] *::selection { background:#e3ca87; color:#292a23; }
+.scripture-verses [data-select-passage] { -webkit-user-drag:none; -webkit-user-select:text; user-select:text; }
+.verse-tools [data-note-create],.verse-tools [data-note-related] { color:#41503c; font-weight:650; }
+.note-selection {
+  position:fixed; z-index:75; display:flex; align-items:center; gap:.4rem;
+  padding:.62rem .88rem; border:1px solid #a69a74; background:#354335; color:#fff8e6;
+  border-radius:.55rem; box-shadow:0 5px 15px #292e2630; font:600 .83rem var(--sans);
+}
+.note-collection {color:#394332;font-family:var(--sans);min-width:0;}
+.note-add,.note-guest a {
+  display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;
+  padding:.65rem .55rem;color:#f9f4e6;background:#3d4d3b;border:1px solid #3d4d3b;
+  border-radius:.45rem;text-decoration:none;font:620 .84rem/1.35 var(--sans);
+}
+.note-add:hover,.note-guest a:hover,.note-save:hover,.note-selection:hover {background:#2a3b2d;}
+.note-search {display:block;margin:1rem 0 .65rem;font:600 .75rem var(--sans);color:#555d4f;}
+.note-search span {display:block;margin-bottom:.34rem;}
+.note-collection .note-search input {width:100%;font:400 .79rem var(--sans);padding:.55rem .6rem;background:#fffdf6;}
+.note-filter,.note-retry {padding:.35rem .5rem;border:1px solid #bebba5;border-radius:.3rem;background:#f4f1e3;color:#414c36;font:600 .74rem var(--sans);}
+.note-empty,.note-guest p {font:.82rem/1.55 var(--sans);color:#626855;margin:.9rem 0;}
+.note-guest {padding:.5rem 0 1rem;}
+.note-guest h3 {font:500 1.42rem/1.2 var(--serif);margin:.55rem 0;}
+.note-folders details {margin:0;}
+.note-folders summary {display:flex;align-items:center;gap:.35rem;min-height:2.2rem;font:560 .84rem var(--sans);list-style:none;}
+.note-folders summary::-webkit-details-marker {display:none;}
+.note-folders summary::before {content:'›';font:700 .95rem var(--sans);width:.8rem;text-align:center;transition:transform .16s}
+.note-folders details[open] > summary::before {transform:rotate(90deg);}
+.note-branch {border-left:1px solid #cfcdb9;margin-left:.42rem;padding-left:.64rem;}
+.note-chapter > summary {font-size:.75rem;color:#68705f;}
+.note-total {margin-left:auto;font:500 .68rem var(--sans);color:#626b5f;}
+.note-row {display:flex;align-items:start;gap:.15rem;padding:.2rem 0 .35rem .1rem;}
+.note-row > a {display:grid;grid-template-columns:.7rem 1fr;gap:.1rem .4rem;min-width:0;flex:1;text-decoration:none;padding:.27rem 0;line-height:1.3;}
+.note-row > a:hover strong {text-decoration:underline;}
+.note-row strong,.note-row small {overflow-wrap:anywhere;}
+.note-row strong {font-size:.81rem;color:#394633;}
+.note-row small {grid-column:2;color:#676a59;font:.72rem/1.4 var(--sans);}
+.note-dot {width:.58rem;height:.78rem;align-self:start;margin-top:.17rem;background:var(--note-ink);border:1px solid #7b715b75;clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);}
+.note-row button {display:grid;place-items:center;min-height:34px;min-width:32px;padding:.25rem;background:transparent;color:#5d654f;border-radius:.35rem;}
+.note-row button:hover {background:#e5e5d4;}
+
+/* O formulário cabe inteiro em telas altas. Em um telefone pequeno, somente
+   o conteúdo do diálogo rola; o livro permanece na posição de leitura. */
+.note-editor {
+  width:min(30.5rem,calc(100vw - 1.25rem)); max-height:calc(100dvh - 1.25rem);
+  margin:auto; padding:0; border:1px solid #b9b6a0;border-radius:.82rem; color:#33392e;
+  background:#fcf9ee;box-shadow:0 22px 80px #282a234a;overscroll-behavior:contain;
+}
+.note-editor::backdrop { background:#2c3028a8; }
+.note-editor form {margin:0;padding:clamp(1rem,3.2vw,1.65rem);font:400 .85rem/1.45 var(--sans);}
+.note-editor-top {display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;}
+.note-editor-top > span {display:flex;align-items:center;gap:.45rem;color:#756540;font:650 .74rem var(--sans);}
+.note-editor-top > button {display:grid;place-items:center;width:34px;height:34px;background:#f0eddf;border-radius:50%;color:#505844;}
+.note-editor h2 {margin:0 0 .2rem;font:500 2rem/1.06 var(--serif);letter-spacing:-.045em;}
+.note-reference {margin:0;color:#566449;font:650 .85rem var(--sans);}
+.note-quote {margin:.85rem 0 0;border-left:3px solid #bfa46c;padding:.15rem .65rem;color:#5f5949;font:italic 1.03rem/1.35 var(--serif);overflow-wrap:anywhere;max-height:5.5rem;overflow:auto;}
+.note-editor label:not(.note-swatch),.note-colors legend {display:block;font:630 .8rem/1.4 var(--sans);color:#434b3d;}
+.note-editor label:not(.note-swatch) {margin-top:.85rem;}
+.note-editor .note-range {display:grid;grid-template-columns:1fr 1fr;gap:.75rem;}
+.note-editor :is(select,input[type=text],input[name=title],textarea) {display:block;width:100%;font:400 .92rem/1.4 var(--sans);padding:.52rem .68rem;margin-top:.3rem;background:#fffdf7;border:1px solid #c6c3ae;color:#30372d;border-radius:.37rem;}
+.note-editor textarea {resize:vertical;min-height:4rem;}
+.note-optional {color:#777867;font-size:.72rem;font-weight:400;margin-left:.22rem;}
+.note-colors {display:flex;flex-wrap:wrap;gap:.28rem .4rem;margin:.95rem 0 0;padding:0;border:0;}
+.note-colors legend {margin-bottom:.35rem;}
+.note-swatch {position:relative;display:inline-flex;gap:.26rem;align-items:center;font:550 .75rem var(--sans);cursor:pointer;padding:.27rem .33rem .27rem .25rem;border:1px solid transparent;border-radius:.3rem;}
+.note-swatch input {position:absolute;width:1px;height:1px;clip-path:inset(50%);}
+.note-swatch:has(input:focus-visible) {outline:2px solid #8b734a;outline-offset:2px;}
+.note-swatch:has(input:checked) {border-color:#959980;background:#eeeddf;}
+.note-chip {display:grid;place-items:center;width:1.05rem;height:1.05rem;background:var(--note-ink);border:1px solid #6f70575e;border-radius:50%;}
+.note-chip svg {visibility:hidden;color:#354333;}
+.note-swatch input:checked + .note-chip svg {visibility:visible;}
+.note-personal,.note-error {font-size:.76rem;line-height:1.45;margin:.75rem 0 0;}
+.note-personal {color:#666a5c;}
+.note-error {color:#8b3727;}
+.note-editor-actions,.note-confirm {display:flex;align-items:center;justify-content:flex-end;gap:.45rem;flex-wrap:wrap;border-top:1px solid #d8d4c0;margin-top:1rem;padding-top:.75rem;}
+.note-editor-actions button,.note-confirm button {min-height:38px;padding:.43rem .75rem;border-radius:.4rem;font-size:.81rem;font-weight:650;}
+.note-save {color:#fff8e9;background:#3d4d3b;}
+.note-cancel {background:transparent;border:1px solid #c3c1ad;color:#4a5443;}
+.note-delete {margin-right:auto;color:#884938;background:transparent;}
+.note-confirm p {margin:0;width:100%;font-weight:600;}
+.note-danger {background:#854a38;color:#fff9ee;}
+.note-editor button:disabled {opacity:.6;}

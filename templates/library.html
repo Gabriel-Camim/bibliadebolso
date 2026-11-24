@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Minha biblioteca · bibliadebolso.com{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='library.css') }}">{% endblock %}
+{# As ações que alteram a biblioteca exigem POST e o token da sessão atual. #}
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+{% block content %}
+<section class="library" aria-labelledby="library-title">
+  <h1 id="library-title">Minha biblioteca</h1>
+  <nav class="library-tabs" aria-label="Coleções da biblioteca">
+    <a href="{{ url_for('library.index', aba='favoritos') }}" {% if tab == 'favoritos' %}aria-current="page"{% endif %}>Favoritos</a>
+    <a href="{{ url_for('library.index', aba='historico') }}" {% if tab == 'historico' %}aria-current="page"{% endif %}>Histórico de leitura</a>
+    <a href="{{ url_for('bible.index', indice='notas', _anchor='indice-biblico') }}">Anotações na Bíblia</a>
+  </nav>
+  {% if tab == 'historico' %}
+    {% if history_enabled %}
+    <details class="library-options">
+      <summary>Gerenciar histórico</summary>
+      <p>O histórico registra as passagens que você sorteia ou abre. Seus favoritos ficam guardados separadamente.</p>
+      <div class="library-actions">
+        <form method="post" action="{{ url_for('library.clear_history') }}">{{ csrf() }}
+          <button class="button secondary">Apagar todas as leituras registradas</button></form>
+        <form method="post" action="{{ url_for('library.history_preference') }}">{{ csrf() }}
+          <button class="button secondary" name="choice" value="disable">Apagar e desativar histórico</button></form>
+      </div>
+    </details>
+    {% elif not g.user.disabled %}
+    <section class="library-options" aria-label="Autorização para registrar o histórico">
+      <h2>Guardar minhas leituras</h2>
+      <p>Com sua autorização, a biblioteca guarda no seu perfil cada passagem sorteada ou aberta e o horário da leitura.
+        Essas escolhas podem revelar convicções religiosas. Você pode apagar os registros e desativar o histórico aqui a qualquer momento.</p>
+      <form method="post" action="{{ url_for('library.history_preference') }}">{{ csrf() }}
+        <button class="button secondary" name="choice" value="enable">Autorizar e ativar meu histórico</button>
+      </form>
+    </section>
+    {% endif %}
+  {% endif %}
+  {% if entries %}
+  <p class="library-date">Horário de Brasília (UTC−3)</p>
+  <ul class="library-entries" aria-label="{{ 'Versículos favoritos' if tab == 'favoritos' else 'Leituras registradas' }}">
+    {% for entry in entries %}
+    <li class="library-card">
+      <article>
+        {% if entry.verse %}
+          <h2>{{ entry.verse.reference }}</h2>
+          <blockquote>{{ entry.verse.text }}</blockquote>
+        {% else %}<h2>Passagem indisponível nesta edição</h2>{% endif %}
+        <p class="library-date">
+          {% if tab == 'favoritos' %}
+            {% if entry.drawn_at is not none %}Sorteado em {{ entry.drawn_at|library_date }} · {% endif %}
+            Salvo em {{ entry.saved_at|library_date }}
+          {% else %}
+            {{ 'Sorteado' if entry.kind == 'draw' else 'Aberto no navegador' }} em {{ entry.occurred_at|library_date }}
+          {% endif %}
+        </p>
+        <div class="library-actions">
+          {% if entry.verse %}
+          <a href="{{ url_for('bible.locate', verse_id=entry.verse_id) }}">Navegar até o versículo</a>
+          <a href="{{ url_for('study.start', verse_id=entry.verse_id) }}">Estudar com IA</a>
+          {% endif %}
+          {% if tab == 'favoritos' %}
+            <form method="post" action="{{ url_for('library.remove_favorite', verse_id=entry.verse_id) }}">{{ csrf() }}
+              <button class="library-action-link">Remover favorito</button></form>
+          {% elif entry.favorite %}<span class="library-saved">{{ icon('check', 16) }} Salvo nos favoritos</span>
+          {% elif entry.verse and not g.user.disabled %}
+            <form method="post" action="{{ url_for('library.favorite_entry', entry_id=entry.id) }}" data-favorite-form data-verse-id="{{ entry.verse_id }}">{{ csrf() }}
+              <input type="hidden" name="pagina" value="{{ page }}">
+              <button class="library-action-link" data-favorite-button type="submit"><span data-favorite-label>Favoritar</span></button></form>
+          {% endif %}
+        </div>
+      </article>
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif tab == 'favoritos' %}
+  <p class="library-empty">Seus versículos favoritos aparecem aqui. <a href="/">Abrir a leitura</a></p>
+  {% elif history_enabled %}
+  <p class="library-empty">Suas próximas leituras aparecem aqui. <a href="/">Sortear um versículo</a></p>
+  {% endif %}
+  {% if page > 1 or has_more %}
+  <nav class="library-pages" aria-label="Páginas da biblioteca">
+    {% if page > 1 %}<a rel="prev" href="{{ url_for('library.index', aba=tab, pagina=page-1) }}">← Anterior</a>{% endif %}
+    <span>Página {{ page }}</span>
+    {% if has_more %}<a rel="next" href="{{ url_for('library.index', aba=tab, pagina=page+1) }}">Próxima →</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Atendimento · bibliadebolso.com{% endblock %}
+{% block content %}
+<article class="legal">
+  <p class="eyebrow">BÍBLIA DE BOLSO · {{ error.code }}</p>
+  <h1>{{ {400:'Revise a solicitação',403:'Acesso restrito',404:'Página não encontrada',503:'Serviço indisponível'}.get(error.code,'Não foi possível continuar') }}</h1>
+  {% if error.description and error.description != error.__class__.description %}<p>{{ error.description }}</p>{% endif %}
+  <a class="button primary" href="/">Voltar à leitura</a>
+</article>
+{% endblock %}

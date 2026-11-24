@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Configurar agente · bibliadebolso.com{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='study.css') }}">{% endblock %}
+{% block content %}
+<section class="account-wrap account-card">
+  <a href="/admin">← Administração</a>
+  <h1>Comportamento do agente</h1>
+  <p>As alterações valem a partir da próxima pergunta. O modelo utilizado é {{ model }}.</p>
+  {% if error %}<p role="alert" class="notice">{{ error }}</p>{% endif %}
+  <form method="post" class="account-form study-compose">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="system_message">Mensagem de sistema</label>
+    <textarea id="system_message" name="system_message" maxlength="8000" rows="8" required>{{ settings.system_message }}</textarea>
+    <label for="temperature">Temperatura</label>
+    <input id="temperature" name="temperature" type="number" min="0" max="2" step="any" required value="{{ settings.temperature }}" aria-describedby="temp-help">
+    <small id="temp-help">Valores perto de zero favorecem respostas consistentes. Aumentar o valor permite mais variação entre respostas.</small>
+    <button class="button primary">Salvar configurações</button>
+  </form>
+</section>
+{% endblock %}

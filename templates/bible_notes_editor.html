@@ -1,0 +1,43 @@
+{% if g.user %}
+{# O diálogo permanece montado ao virar páginas. Os números do capítulo são
+   carregados ao abri-lo, inclusive ao editar uma anotação de outro livro. #}
+<button type="button" class="note-selection" data-note-selection hidden>{{ icon('feather',15) }} <span>Marcar seleção</span></button>
+<dialog id="bible-note-editor" class="note-editor" aria-labelledby="note-editor-title"
+  data-notes-url="{{ url_for('bible_notes.index') }}" data-numbers-url="{{ number_url }}"
+  data-note-readonly="{{ 'true' if g.user.disabled else 'false' }}">
+  <form id="bible-note-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <header class="note-editor-top"><span>{{ icon('bookmark',18) }} Marca-páginas</span>
+      <button type="button" data-note-close aria-label="Fechar marca-página">{{ icon('close',18) }}</button>
+    </header>
+    <h2 id="note-editor-title">Marcar passagem</h2>
+    <p class="note-reference" data-note-reference></p>
+    <blockquote class="note-quote" data-note-quote hidden></blockquote>
+    <div class="note-range">
+      <label>Do versículo<select name="start_verse" required></select></label>
+      <label>Até o versículo<select name="end_verse" required></select></label>
+    </div>
+    <fieldset class="note-colors"><legend>Marca-texto</legend>
+      {% for tone, name in [('gold','Mel'),('sage','Sálvia'),('rose','Rosa'),('blue','Céu'),('none','Sem cor')] %}
+      <label class="note-swatch" data-tone="{{ tone }}"><input type="radio" name="color" value="{{ tone }}" {{ 'checked' if loop.first }}>
+        <span class="note-chip" aria-hidden="true">{{ icon('check',14) }}</span> {{ name }}
+      </label>
+      {% endfor %}
+    </fieldset>
+    <label>Título <span class="note-optional">opcional</span><input name="title" maxlength="100" placeholder="Dê um nome a esta passagem"></label>
+    <label>Anotação <span class="note-optional">opcional</span><textarea name="body" rows="3" maxlength="3000" placeholder="O que você quer lembrar ao reler?"></textarea></label>
+    <p class="note-personal">A marcação fica no seu perfil. Você pode editá-la ou apagá-la.</p>
+    <p class="note-error" data-note-error role="alert" hidden></p>
+    <footer class="note-editor-actions">
+      <button type="button" class="note-delete" data-note-delete hidden>Excluir</button>
+      <button type="button" class="note-cancel" data-note-close>Cancelar</button>
+      <button type="submit" class="note-save">Salvar marcação</button>
+    </footer>
+    <div class="note-confirm" data-note-confirm hidden>
+      <p>Excluir esta marcação e sua anotação?</p>
+      <button type="button" class="note-cancel" data-note-keep>Manter</button>
+      <button type="button" class="note-danger" data-note-remove>Excluir marcação</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}

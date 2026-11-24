@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% from 'study_parts.html' import row with context %}
+{% block title %}Histórico de estudos · bibliadebolso.com{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='study.css') }}">{% endblock %}
+{% block content %}
+<section class="chat-archive" data-chat-archive>
+  <a class="archive-return" href="{{ url_for('accounts.profile') }}">← Minha conta</a>
+  <h1>Histórico de estudos</h1>
+  <a href="{{ url_for('study.index') }}">Abrir o guia de estudos</a>
+  <ul class="thread-list" data-thread-list>{% for chat in chats %}{{ row(chat) }}{% endfor %}</ul>
+  <p class="empty-threads" data-empty-threads {% if chats %}hidden{% endif %}>Você ainda não tem conversas salvas.</p>
+  {% if consented %}
+  <details class="archive-privacy"><summary>Revogar autorização do chat</summary>
+    <p>Isso apaga todas as suas conversas e o contexto salvo e encerra a autorização de envio de mensagens para estudo.</p>
+    <form method="post" action="{{ url_for('study.revoke') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="button secondary" type="submit">Revogar e excluir histórico</button></form>
+  </details>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}<script defer src="{{ url_for('static', filename='study.js') }}"></script>{% endblock %}

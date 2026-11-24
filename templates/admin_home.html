@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Administração · bibliadebolso.com{% endblock %}
+{% block content %}
+<section class="account-admin">
+  <header>
+    <h1>Administração</h1>
+    <nav class="account-actions" aria-label="Configurações administrativas">
+      <a class="button secondary" href="{{ url_for('billing.admin_checkout') }}">Checkout e vendas</a>
+      <a class="button secondary" href="{{ url_for('study.settings') }}">Configurar agente</a>
+    </nav>
+  </header>
+  {# O total de contas criadas é histórico. A busca abaixo mostra somente os
+     cadastros que ainda existem, inclusive os que tiveram estudos suspensos. #}
+  <dl class="account-stats">
+    <div><dt>Visitas ao leitor</dt><dd>{{ totals.visits }}</dd></div>
+    <div><dt>Versículos gerados</dt><dd>{{ totals.verses }}</dd></div>
+    <div><dt>Contas criadas</dt><dd>{{ created }}</dd></div>
+    <div><dt>Faturamento bruto</dt><dd>{{ sales.gross_cents|brl }}</dd></div>
+  </dl>
+  <article class="panel account-table">
+    <h2>Contas de usuários</h2>
+    <form method="get" class="account-actions" role="search">
+      <label for="admin-search">Nome ou e-mail</label>
+      <input type="search" id="admin-search" name="q" maxlength="200" value="{{ search }}">
+      <button class="button secondary" type="submit">Buscar</button>
+      {% if search %}<a href="{{ url_for('accounts.admin_home') }}">Limpar</a>{% endif %}
+    </form>
+    <p>{{ count }} {{ 'conta encontrada' if count == 1 else 'contas encontradas' }}</p>
+    {% if users %}
+    <div class="account-scroll">
+      <table>
+        <thead><tr><th>Pessoa</th><th>Cadastro (UTC)</th><th>Acesso</th><th>Ação</th></tr></thead>
+        <tbody>{% for person in users %}
+          <tr>
+            <td><strong>{{ person.name }}</strong><br>{{ person.email }}</td>
+            <td>{{ person.created_at[:10] }}</td>
+            <td>{{ 'Suspenso' if person.disabled else 'Ativo' }}</td>
+            <td>{% if person.id != g.user.id %}
+              <form method="post" action="{{ url_for('accounts.set_access', user_id=person.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="q" value="{{ search }}">
+                <input type="hidden" name="page" value="{{ page }}">
+                <button class="button secondary" name="action" value="{{ 'reativar' if person.disabled else 'suspender' }}">{{ 'Reativar' if person.disabled else 'Suspender' }}</button>
+              </form>
+              {% else %}Proprietário{% endif %}
+            </td>
+          </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% if pages > 1 %}
+    <nav class="account-actions" aria-label="Páginas dos resultados">
+      {% if page > 1 %}<a href="{{ url_for('accounts.admin_home', q=search, page=page-1) }}">Anterior</a>{% endif %}
+      <span>Página {{ page }} de {{ pages }}</span>
+      {% if page < pages %}<a href="{{ url_for('accounts.admin_home', q=search, page=page+1) }}">Próxima</a>{% endif %}
+    </nav>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

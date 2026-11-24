@@ -1,0 +1,12 @@
+# Apenas o código, o acervo público e as ilustrações vão para a imagem.
+# As chaves e o banco real são fornecidos pela hospedagem durante a execução.
+.git
+.env
+.env.*
+.venv
+instance
+__pycache__
+**/__pycache__
+*.pyc
+tests
+personagens-biblia-de-bolso.png

@@ -1,0 +1,66 @@
+/* A folha e a gravura vivem lado a lado. A altura acompanha o texto em vez
+   de recortar uma passagem longa ou ampliada pelo controle de leitura. */
+body[data-view="reader"] {background:radial-gradient(ellipse at 18% 12%,#fbf9f0,transparent 68%),var(--paper)}
+body[data-view="reader"] .main-shell {margin-top:clamp(1.5rem,3vw,3rem);min-height:auto}
+.reading-heading {display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:clamp(1rem,2vw,1.65rem)}
+.reading-heading h1 {margin:0;font-size:clamp(2.5rem,4.6vw,4.25rem);line-height:1.01;letter-spacing:-.063em}
+.folio {display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);position:relative;isolation:isolate;background:#fbf7eb url(papel.png);border:1px solid #b8ae92;border-radius:6px 12px 12px 6px;box-shadow:0 3px 0 -1px #efeadb,0 4px 0 -1px #c4baa2,0 7px 0 -2px #eee9d9,0 8px 0 -2px #c5bca7,0 19px 38px -27px #353724}
+.passage {padding:clamp(1.9rem,4vw,4.5rem);align-self:center;min-width:0}
+.passage .edition {font-size:.73rem;letter-spacing:.14em;color:#79623e}
+.edition span {width:2.2rem;height:1px;background:#a38451}
+.passage blockquote {font:500 var(--reading-size,clamp(2rem,2.85vw,3.25rem))/1.23 var(--reading-face,var(--serif));letter-spacing:-.035em;margin:clamp(1.6rem,3.2vw,3rem) 0 1rem;text-wrap:pretty;overflow-wrap:anywhere}
+.reference {display:flex;align-items:center;gap:.6rem;font:italic 1.2rem/1.4 var(--serif);color:#74613d;margin:0}
+.reference::before {content:"";width:1.15rem;height:1px;background:#b79c6a}
+.reader-actions,.passage-links,.passage-links :is(a,button),.folio-note,.folio-note a,.folio-note button {display:flex;align-items:center}
+.reader-actions {gap:.6rem;margin-top:clamp(1.45rem,2.6vw,2.6rem);flex-wrap:wrap}
+.passage-links {flex-wrap:wrap;gap:0 1rem;margin-top:.48rem}
+.passage-links :is(a,button),.folio-note a,.folio-note button {min-height:40px;gap:.42rem;padding:.18rem 0;background:transparent;text-decoration:none;color:#555b49;font-size:.865rem;line-height:1.4}
+.passage-links :is(a,button):hover,.folio-note a:hover,.folio-note button:hover {text-decoration:underline}
+[data-favorite-button][aria-pressed="true"] svg {fill:#a88a48;stroke:#695b37}
+#draw-error:not(:empty) {margin-top:.6rem;color:#884427}
+.illustration {position:relative;overflow:hidden;isolation:isolate;align-self:stretch;margin:clamp(.65rem,1.3vw,1.15rem);margin-left:0;min-height:clamp(25rem,38vw,34rem);border-radius:2px 5px 5px 2px;background:#d8c397}
+.landscape,.print-frame,.flock {position:absolute;inset:0;pointer-events:none}
+.landscape {background:#d9c79e url(colinas-galileia.jpg) center center / cover no-repeat}
+.print-frame {z-index:4;inset:.55rem;border:1px solid #fff2c68c;box-shadow:0 0 0 1px #444a333b}
+#shepherd {position:absolute;z-index:2;left:47%;bottom:12%;height:clamp(9rem,19vw,16.5rem);width:auto;transform-origin:50% 95%;translate:-50% 0;filter:drop-shadow(0 7px 3px #533f2d3d);animation:shepherd-breath 4s ease-in-out infinite}
+.cloud {position:absolute;opacity:.75;filter:sepia(.18);pointer-events:none;animation:cloud-travel 19s ease-in-out infinite alternate}
+.cloud-one {width:24%;top:12%;left:6%}
+.cloud-two {width:15%;top:21%;left:58%;animation-delay:-7s;animation-duration:24s}
+.flock {z-index:3}
+.lamb-trail {position:absolute;display:block;filter:drop-shadow(0 4px 2px #5c4c3840);animation:pasture-walk 14s linear infinite}
+.trail-one {width:18.5%;left:7%;bottom:9%;--stride:110%}
+.trail-two {width:14.5%;left:61%;bottom:17%;--stride:88%;animation-duration:11s;animation-delay:-4s}
+.lamb {display:block;width:100%;height:auto;transform-origin:50% 85%;animation:lamb-step .62s ease-in-out infinite}
+.trail-two .lamb {animation-delay:-.28s}
+.illustration.drawing .lamb {animation:lamb-hop .62s ease-out 2}
+.illustration.drawing #shepherd {animation:shepherd-nod .65s ease-out}
+#reading.reading-new {animation:ink-arrives .45s ease-out}
+@keyframes shepherd-breath {50% {transform:translateY(-3px) rotate(1.4deg)}}
+@keyframes shepherd-nod {45% {transform:translateY(-6px) rotate(-2deg)}}
+@keyframes cloud-travel {from {transform:translateX(-13%)} to {transform:translateX(39%)}}
+@keyframes pasture-walk {0%,100% {transform:translateX(0) scaleX(1)} 47% {transform:translateX(var(--stride)) scaleX(1)} 50%,52% {transform:translateX(var(--stride)) scaleX(-1)} 96% {transform:translateX(0) scaleX(-1)}}
+@keyframes lamb-step {50% {transform:translateY(-3px) rotate(-2.1deg)}}
+@keyframes lamb-hop {50% {transform:translateY(-16px) rotate(-5deg)}}
+@keyframes ink-arrives {from {opacity:.15;transform:translateY(5px)} to {opacity:1;transform:none}}
+.folio-note {justify-content:space-between;gap:.7rem;margin:.85rem .1rem 0}
+.folio-note a,.folio-note button {color:#626653;font-size:.83rem}
+@media(max-width:57rem) {
+  .passage {padding:1.65rem}
+  .illustration {min-height:23rem}
+}
+@media(max-width:45rem) {
+  .reading-heading h1 {font-size:clamp(2rem,8vw,2.8rem)}
+  .appearance summary {font-size:.8rem;padding:.48rem .65rem}
+  .folio {display:flex;flex-direction:column;border-radius:.65rem}
+  .illustration {order:-1;margin:.55rem .55rem 0;height:clamp(9rem,37vw,15rem);min-height:0;border-radius:.27rem}
+  .landscape {background-position:center 57%}
+  #shepherd {height:79%;left:59%;bottom:5%}
+  .trail-one {width:11%;bottom:5%;left:28%}
+  .trail-two {width:9%;bottom:8%;left:69%}
+  .cloud-one {width:13%}
+  .cloud-two {width:9%}
+  .passage {align-self:stretch;padding:1.5rem 1.25rem 1.05rem}
+  .passage blockquote {font-size:var(--reading-size,clamp(1.65rem,6vw,2.25rem));margin:1.05rem 0 .75rem}
+  .reader-actions {margin-top:1.3rem}
+  .folio-note {flex-wrap:wrap}
+}

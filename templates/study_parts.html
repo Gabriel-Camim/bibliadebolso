@@ -1,0 +1,47 @@
+{# Os ícones são traçados locais com rótulos acessíveis nos controles. #}
+{% macro glyph(name, size=20) -%}
+{% set shapes = {
+  'plus':'M12 5v14M5 12h14', 'menu':'M3 6h18M3 12h18M3 18h18',
+  'close':'M6 6l12 12M18 6 6 18','send':'M12 20V4m-7 7 7-7 7 7',
+  'arrow':'M5 12h14m-6-6 6 6-6 6','external':'M7 17 18 6M9 6h9v9',
+  'chat':'M20 11a7.6 7.6 0 0 1-8 7.5 10 10 0 0 1-3-.4L4 20l1.2-4.6A6.8 6.8 0 0 1 4 11a8 8 0 1 1 16 0z',
+  'trash':'M3.5 6.5h17M9 6V3.5h6V6M6 7l1 13h10l1-13M10 10v6m4-6v6',
+  'history':'M3 11a9 9 0 1 1 2 6M3 4v7h7m2-5v6l4 2',
+  'passage':'M4 5c3.5-.8 6-.4 8 1.5 2-1.9 4.5-2.3 8-1.5v13c-3.1-.7-5.5-.2-8 1.7-2.5-1.9-4.9-2.4-8-1.7zM12 6.5v13',
+  'spark':'m12 2 1.9 6.8L21 11l-7.1 2.1L12 20l-2.1-6.9L3 11l6.9-2.2z'
+} %}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ shapes[name] }}"></path></svg>
+{%- endmacro %}
+
+{% macro row(chat, current_id=none) -%}
+<li class="thread-row{% if chat and chat.id == current_id %} thread-current{% endif %}" data-thread-id="{{ chat.id if chat else '' }}">
+  <a class="thread-link"{% if chat %} href="{{ url_for('study.chat', chat_id=chat.id) }}" title="{{ chat.title or chat.reference }}"{% endif %}
+     {% if chat and chat.id == current_id %}aria-current="page"{% endif %}>
+    {{ glyph('chat',16) }}<span><strong data-thread-title>{{ (chat.title or chat.reference) if chat else '' }}</strong><small data-thread-ref>{{ chat.reference if chat else '' }}</small></span>
+  </a>
+  {# Sem scripts, o details abre a confirmação e envia um formulário normal. #}
+  <details class="thread-delete"><summary aria-label="Excluir conversa">{{ glyph('trash',15) }}</summary>
+    <form data-thread-delete method="post"{% if chat %} action="{{ url_for('study.delete_chat', chat_id=chat.id) }}"{% endif %}>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <span>Excluir esta conversa?</span>
+      <div><button type="button" class="cancel-delete" data-cancel-delete>Cancelar</button><button type="submit" class="confirm-delete">Excluir</button></div>
+    </form>
+  </details>
+</li>
+{%- endmacro %}
+
+{% macro sources(items) -%}
+{% if items %}
+<details class="chat-sources">
+  <summary>{{ glyph('passage',14) }} Passagens consultadas <span aria-hidden="true">⌄</span></summary>
+  <ul>{% for source in items %}<li>
+    {% if source.id %}<a href="{{ url_for('bible.locate', verse_id=source.id) }}">{{ source.reference }}</a>{% else %}<strong>{{ source.reference }}</strong>{% endif %}
+    <p>{{ source.text }}</p>
+  </li>{% endfor %}</ul>
+</details>
+{% endif %}
+{%- endmacro %}
+
+{% macro assistant_label() -%}
+<div class="assistant-label"><span aria-hidden="true">{{ glyph('spark',14) }}</span>Guia de estudos <small>IA</small></div>
+{%- endmacro %}

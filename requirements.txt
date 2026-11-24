@@ -1,0 +1,8 @@
+# Servidor web, templates HTML, cliente OpenID Connect e configuração local.
+Flask>=3.1.3,<4
+Authlib>=1.6.10,<2
+requests>=2.32,<3
+python-dotenv>=1.2,<2
+waitress>=3.0,<4
+# No Windows, fornece ao zoneinfo as regras do fuso do painel financeiro.
+tzdata>=2025.2

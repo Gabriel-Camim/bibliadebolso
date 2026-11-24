@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='bible_browser.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='bible_index.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='bible_notes.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='bible_jump.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="scripture" data-book-reader>
+  {% include 'bible_index.html' %}
+  <div class="bible-reading">
+  <div class="scripture-toolbar">
+    <div class="scripture-titles"><p>Bíblia Portuguesa Mundial</p><h1>Bíblia Sagrada</h1></div>
+    <div class="scripture-tools">
+      <a class="index-open" data-open-bible-index href="#indice-biblico" aria-controls="indice-biblico">{{ icon('menu',16) }} Índice</a>
+      <details class="scripture-appearance"><summary aria-label="Ajustar leitura" title="Ajustar leitura"><span class="type-icon">Aa</span></summary>
+        <div class="scripture-popup">
+          <h2>Ajustar leitura</h2>
+          <label>Fonte<select id="reader-face"><option value="classic">Clássica</option><option value="serif">Serifada</option><option value="sans">Sem serifa</option></select></label>
+          <label>Tamanho<select id="reader-size"><option value="normal">Normal</option><option value="large">Grande</option><option value="larger">Muito grande</option></select></label>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  {% include 'bible_spread.html' %}
+  {% include 'bible_notes_editor.html' %}
+  <div class="book-guide"><span>{{ icon('feather',15) }} Toque em um versículo para estudá-lo.</span>
+    <span class="book-guide-keys"><kbd>←</kbd> <kbd>→</kbd> Virar páginas</span></div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+  <script defer src="{{ url_for('static', filename='bible_index.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='bible_browser.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='bible_notes.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='bible_jump.js') }}"></script>
+{% endblock %}

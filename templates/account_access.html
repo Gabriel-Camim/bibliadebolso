@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Criar conta' if signup else 'Entrar' }} · bibliadebolso.com{% endblock %}
+{% macro hidden_fields() -%}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next_url }}">
+{%- endmacro %}
+{% macro policies() -%}
+  <label class="account-check"><input type="checkbox" name="accept_policies" value="yes" required>
+    <span>Li e aceito os <a href="/termos" target="_blank" rel="noopener">termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">política de privacidade</a>.</span></label>
+{%- endmacro %}
+{% block content %}
+{% set selected = request.args.get('metodo') if signup else none %}
+<section class="access-spread">
+  <div class="access-art" aria-hidden="true">
+    <img src="{{ url_for('static',filename='personagens/jesus-le.png') }}" class="access-guide" alt="">
+    <img src="{{ url_for('static',filename='personagens/ovelha-passo-1.png') }}" class="access-lamb" alt="">
+  </div>
+  <div class="access-paper">
+    <h1>{{ 'Crie sua conta' if signup else 'Entre na sua conta' }}</h1>
+    {% if selected in ('google','facebook') %}
+      {% set provider = 'Google' if selected == 'google' else 'Facebook' %}
+      <p>Crie seu perfil da Bíblia de Bolso com sua conta {{ provider }}.</p>
+      <form class="account-form" method="post" action="{{ url_for('accounts.signup' if selected == 'google' else 'facebook_auth.signup') }}">
+        {{ hidden_fields() }}{{ policies() }}
+        <button class="button primary" {% if not (google_ready if selected=='google' else facebook_ready) %}disabled{% endif %}>Continuar com {{ provider }}</button>
+      </form>
+      <a href="{{ url_for('accounts.signup',next=next_url) }}">Escolher outra forma de cadastro</a>
+    {% else %}
+      <p>{{ 'Guarde suas passagens, anotações e estudos em um só lugar.' if signup else 'Use a mesma forma de acesso do cadastro para reencontrar suas passagens e conversas.' }}</p>
+      <form method="post" class="account-form" action="{{ url_for('password_auth.signup' if signup else 'password_auth.login') }}">
+        {{ hidden_fields() }}
+        {% if signup %}
+          <label>Nome de usuário<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" required aria-describedby="username-hint"></label>
+          <small id="username-hint">De 3 a 32 caracteres. Use letras sem acento, números, ponto, hífen ou sublinhado.</small>
+          <label>E-mail<input type="email" name="email" autocomplete="email" maxlength="254" required></label>
+        {% else %}
+          <label>Nome de usuário ou e-mail<input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+        {% endif %}
+        <label>Senha<input type="password" name="password" autocomplete="{{ 'new-password' if signup else 'current-password' }}" {% if signup %}minlength="12" maxlength="128" aria-describedby="password-hint"{% endif %} required></label>
+        {% if signup %}<small id="password-hint">Use de 12 a 128 caracteres.</small>{% endif %}
+        {% if signup or request.args.get('aceite') == '1' %}{{ policies() }}{% endif %}
+        <button class="button primary" type="submit">{{ 'Criar conta' if signup else 'Entrar' }}</button>
+      </form>
+      <div class="access-divider"><span>ou continue com</span></div>
+      <div class="access-social">
+        {# O formulário de senha e os provedores são independentes. Escolher um
+           provedor nunca envia a senha que possa ter sido digitada acima. #}
+        {% for key, label, ready in [('google','Google',google_ready),('facebook','Facebook',facebook_ready)] %}
+          {% if ready and signup %}
+            <a href="{{ url_for('accounts.signup',metodo=key,next=next_url) }}" class="social-option"><span class="social-mark {{ key }}" aria-hidden="true">{{ 'G' if key=='google' else 'f' }}</span>{{ label }}</a>
+          {% else %}
+            <form method="post" action="{{ url_for('accounts.login' if key=='google' else 'facebook_auth.login') }}">
+              {{ hidden_fields() }}<button class="social-option" type="submit" {% if not ready %}disabled aria-describedby="auth-unavailable"{% endif %}><span class="social-mark {{ key }}" aria-hidden="true">{{ 'G' if key=='google' else 'f' }}</span>{{ label }}</button>
+            </form>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if not google_ready or not facebook_ready %}<p id="auth-unavailable" class="access-state">{{ 'Google e Facebook aguardam' if not google_ready and not facebook_ready else ('Google aguarda' if not google_ready else 'Facebook aguarda') }} ativação neste site.</p>{% endif %}
+    {% endif %}
+    <p class="account-switch">{{ 'Já tem conta?' if signup else 'Primeira visita?' }}
+      <a href="{{ url_for('accounts.login' if signup else 'accounts.signup',next=next_url) }}">{{ 'Entrar' if signup else 'Criar uma conta' }}</a></p>
+  </div>
+</section>
+{% endblock %}

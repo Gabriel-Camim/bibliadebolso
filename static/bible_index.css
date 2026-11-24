@@ -1,0 +1,68 @@
+/* O índice é uma margem de consulta sempre aberta no computador. As páginas
+   mantêm a própria largura de leitura enquanto a árvore rola separadamente. */
+.main-shell:has(.scripture) { width:min(96%,98rem); margin:1.4rem auto 2rem; }
+.scripture { display:grid; grid-template-columns:clamp(14.5rem,20vw,18rem) minmax(0,1fr); gap:clamp(1.25rem,2.2vw,2.4rem); align-items:start; }
+.bible-reading { min-width:0; }
+.bible-index {
+  position:sticky; top:1rem; display:flex; flex-direction:column; min-width:0;
+  max-height:calc(100dvh - 2rem); height:calc(100dvh - 7.5rem);
+  color:#394333; border:1px solid #d5cbb6; border-radius:.7rem;
+  background:#f7f4e9; box-shadow:0 3px 14px #5a513408; overflow:hidden;
+}
+.index-title { display:flex;align-items:center;justify-content:space-between;padding:1rem .95rem .85rem; }
+.index-title > span { display:flex;align-items:center;gap:.55rem;font:500 1.72rem/1.1 var(--serif);letter-spacing:-.045em; }
+.index-title svg {color:#687653;}
+.index-tabs {display:flex;gap:.18rem;margin:0 .75rem .7rem;padding:.2rem;background:#e8e5d8;border-radius:.4rem;}
+.index-tabs button { flex:1; display:flex;align-items:center;justify-content:center;gap:.35rem;white-space:nowrap;min-height:2.25rem;border:0;border-radius:.28rem;background:transparent;color:#626351;font:600 .76rem/1.2 var(--sans);cursor:pointer; }
+.index-tabs button[aria-pressed=true] {background:#fffdf5;color:#344531;box-shadow:0 1px 4px #56492724;}
+#bible-index-books,#bible-index-notes {min-height:0;flex:1;}
+#bible-index-books:not([hidden]) {display:flex;flex-direction:column;}
+#bible-index-books > .bible-jump {width:auto;margin:0 .75rem .45rem;}
+#bible-index-notes {overflow:auto;overscroll-behavior:contain;}
+.bible-tree {overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9b297 transparent;padding:0 .7rem 1.1rem;flex:1;min-height:0;}
+.tree-division {margin:1.1rem .35rem .5rem;color:#7c704d;font:700 .62rem/1.5 var(--sans);letter-spacing:.13em;text-transform:uppercase;}
+.bible-tree details > summary {display:flex;gap:.44rem;align-items:center;list-style:none;cursor:pointer;min-height:2.02rem;border-radius:.3rem;font:550 .84rem/1.3 var(--sans);}
+.bible-tree summary::-webkit-details-marker {display:none;}
+.tree-book > summary { padding:.22rem .4rem; }
+.tree-book > summary svg {color:#797e66;}
+.tree-book[open] > summary {position:sticky;top:0;z-index:1;color:#364c35;background:#e3e8d9;box-shadow:0 1px #d5dbc9;}
+.bible-tree summary:hover {background:#e9e8db;}
+.branch-caret {display:inline-block;flex:none;width:.72rem;text-align:center;color:#777858;font:500 1rem/1 Georgia,serif;}
+.bible-tree details[open] > summary .branch-caret {transform:rotate(90deg);}
+.tree-chapters {border-left:1px solid #d4d1bd;margin:.15rem .2rem .35rem .76rem;padding-left:.5rem;}
+.tree-chapter > summary {padding:.18rem .26rem;}
+.tree-chapter[open] > summary {font-weight:700;color:#4c593f;}
+.tree-passages {margin:0 0 .55rem .45rem;padding:0 0 .2rem .45rem;border-left:1px solid #d4d1bd;}
+.chapter-entry {display:inline-flex;gap:.6rem;align-items:center;padding:.35rem .15rem;color:#5a654c;font:600 .73rem var(--sans);text-decoration:none;}
+.chapter-entry:hover {text-decoration:underline;}
+.verse-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(1.78rem,1fr));gap:.15rem;margin-top:.15rem;}
+.verse-grid a {display:grid;place-content:center;min-height:1.72rem;color:#555642;text-decoration:none;border-radius:.22rem;font:550 .75rem var(--sans);font-variant-numeric:tabular-nums;}
+.verse-grid a:hover {background:#e4e4d4;}
+.verse-grid a[aria-current=location] {background:#475841;color:#fff7df;}
+.index-open,.index-scrim,.index-title [data-index-close] {display:none;}
+.bible-reading .scripture-desk {padding-inline:clamp(.85rem,2vw,2.25rem);}
+.bible-reading .volume-page { padding-inline:clamp(1.1rem,2.2vw,2.65rem); }
+.top-page-turns :is(.leaf-double,.leaf-single) {white-space:nowrap;}
+@media(max-width:960px) {
+  .main-shell:has(.scripture) {width:calc(100% - 2rem);}
+  .scripture {display:block;}
+  .bible-index {position:fixed;inset:0 auto 0 0;height:100dvh;max-height:none;width:min(22rem,88vw);z-index:41;border-width:0 1px 0 0;border-radius:0;box-shadow:8px 0 38px #2e302a22;visibility:hidden;transform:translateX(-101%);transition:transform .2s ease-out,visibility .2s;}
+  .bible-index.drawer-open,html:not(.index-ready) .bible-index:target {visibility:visible;transform:none;}
+  .index-scrim {position:fixed;inset:0;background:#1c231c66;z-index:40;}
+  .drawer-open + .index-scrim,html:not(.index-ready) .bible-index:target + .index-scrim {display:block;}
+  .index-title {padding-top:max(1rem,env(safe-area-inset-top));}
+  .index-title [data-index-close] {display:grid;place-items:center;width:2.6rem;height:2.6rem;}
+  .index-open {display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:42px;padding:.45rem .68rem;border:1px solid #c9c0ab;border-radius:7px;color:#403c30;background:#fbf8ef;text-decoration:none;font:600 .82rem var(--sans);}
+  .bible-tree details > summary {min-height:2.55rem;}
+  .verse-grid {grid-template-columns:repeat(auto-fill,minmax(2.12rem,1fr));}
+  .verse-grid a {min-height:2.1rem;}
+  body.index-opened {overflow:hidden;}
+}
+@media(max-width:760px) {
+  .bible-reading .volume-page.leaf-current {padding-inline:clamp(1.2rem,6vw,2.3rem);}
+  .bible-reading .scripture-desk {padding-inline:.53rem;}
+  .volume-legend {flex-wrap:wrap;gap:.3rem;}
+  .volume-legend > span {gap:.32rem;}
+  .top-page-turns {gap:.3rem;}
+  .scripture-toolbar .scripture-titles h1 {font-size:clamp(1.75rem,7vw,2.7rem);}
+}

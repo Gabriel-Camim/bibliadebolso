@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Minha conta · bibliadebolso.com{% endblock %}
+{% block content %}
+<section class="account-wrap">
+  <div class="panel account-card">
+    <h1>Minha conta</h1>
+    <p><strong>{{ user.name }}</strong>{% if user.email %}<br>{{ user.email }}{% endif %}</p>
+    {% if user.disabled %}<p role="status">O acesso aos estudos está suspenso.</p>{% endif %}
+    <div class="account-actions">
+      <a class="button secondary" href="{{ url_for('library.index') }}">Meus versículos favoritos</a>
+      <a class="button secondary" href="{{ url_for('library.index', aba='historico') }}">Meu histórico de leitura</a>
+      <a class="button secondary" href="{{ url_for('bible.index', indice='notas', _anchor='indice-biblico') }}">Minhas anotações na Bíblia</a>
+      <a class="button secondary" href="/estudo/historico">Meu histórico de estudos</a>
+      <a class="button secondary" href="{{ url_for('billing.offer') }}">Ver assinatura</a>
+      {% if is_admin %}<a class="button" href="{{ url_for('accounts.admin_home') }}">Abrir administração</a>{% endif %}
+    </div>
+    {% if billing_orders %}
+    <section class="account-section" aria-label="Faturas da assinatura">
+      <h2>Faturas</h2>
+      <form method="post" class="account-actions" action="{{ url_for('billing.portal') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {# O cliente que fez uma única contratação só precisa de um botão.
+           Quem voltou a assinar pode escolher o histórico que deseja abrir. #}
+        {% if billing_orders|length > 1 %}
+        <label for="billing-order">Contratação</label>
+        <select id="billing-order" name="order">
+          {% for order in billing_orders %}
+          <option value="{{ order.id }}">{{ order.created|billing_time }}{% if order.sub_status in ('canceled', 'incomplete_expired') %} · encerrada{% endif %}</option>
+          {% endfor %}
+        </select>
+        {% else %}<input type="hidden" name="order" value="{{ billing_orders[0].id }}">{% endif %}
+        <button class="button secondary" type="submit">Gerenciar cobranças</button>
+      </form>
+    </section>
+    {% endif %}
+    {# O identificador é estável. Só o próprio titular o vê nesta página. Isso
+       permite ao proprietário configurar seu acesso sem confiar no e-mail. #}
+    {% if user.auth_provider == 'password' %}
+    <details class="account-section">
+      <summary>Alterar senha</summary>
+      <form class="account-form" method="post" action="{{ url_for('password_auth.change_password') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Senha atual<input type="password" name="current_password" autocomplete="current-password" required></label>
+        <label>Nova senha (12 a 128 caracteres)<input type="password" name="new_password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <button class="button primary" type="submit">Salvar nova senha</button>
+      </form>
+    </details>
+    {% endif %}
+    <details class="account-section">
+      <summary>Dados de identificação</summary>
+      <p>Forma de acesso: {{ {'google':'Google','facebook':'Facebook','password':'Usuário e senha'}[user.auth_provider] }}.</p>
+      {% if user.auth_provider == 'google' %}<p>Identificador da sua conta Google<br><code>{{ user.google_sub }}</code></p>{% endif %}
+      <p>Cadastro criado em {{ user.created_at }} UTC.</p>
+      {% if user.auth_provider in ('google','facebook') %}<p>Para atualizar os dados compartilhados, altere-os no {{ 'Google' if user.auth_provider == 'google' else 'Facebook' }} e entre novamente.</p>{% endif %}
+      <p><a href="/privacidade#contato">Consultar o canal de atendimento de dados pessoais</a></p>
+    </details>
+    <details class="account-section">
+      <summary>Excluir minha conta</summary>
+      <p>Seu cadastro, favoritos, anotações, histórico de leitura e conversas serão apagados. Os registros financeiros necessários à operação permanecem desvinculados da conta local. Se houver assinatura, encerre a cobrança no portal antes de prosseguir.</p>
+      <form method="post" class="account-form" action="{{ url_for('accounts.delete_account') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="delete-confirm">Digite EXCLUIR para confirmar</label>
+        <input id="delete-confirm" name="confirmation" required pattern="EXCLUIR" autocomplete="off">
+        <button class="button secondary" type="submit">Excluir conta e conversas</button>
+      </form>
+    </details>
+    <form method="post" class="account-section" action="{{ url_for('accounts.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="button secondary" type="submit">Sair da conta</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

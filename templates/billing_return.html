@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sua assinatura · bibliadebolso.com{% endblock %}
+{% block content %}
+<section class="panel account-admin">
+  {# Somente o webhook confirma a fatura. Enquanto ele chega, atualizar esta
+     página consulta o banco local e preserva a passagem escolhida. #}
+  {% if paid %}
+    <h1>Seu estudo está disponível</h1>
+    <p>Escolha um versículo no leitor para começar a conversa.</p>
+    <a class="button primary" href="/">Abrir o leitor</a>
+  {% else %}
+    <h1>Aguardando confirmação do pagamento</h1>
+    <p>Quando a Stripe confirmar a fatura, seu estudo será liberado. Você pode consultar a situação novamente.</p>
+    <a class="button primary" href="{{ request.full_path }}">Verificar pagamento</a>
+    <a class="button secondary" href="/">Voltar ao leitor</a>
+  {% endif %}
+</section>
+{% endblock %}

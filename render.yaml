@@ -1,0 +1,27 @@
+# Blueprint da hospedagem gratuita. O acervo público acompanha o código.
+# Contas, anotações e cobranças são gravadas no Turso e sobrevivem aos deploys.
+services:
+  - type: web
+    name: bibliadebolso
+    runtime: python
+    plan: free
+    buildCommand: python -m pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /saude
+    envVars:
+      # O Render fornece PORT e RENDER_EXTERNAL_URL para este serviço.
+      - key: DATABASE_BACKEND
+        value: turso
+      - key: BIND_HOST
+        value: 0.0.0.0
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Segredo de sessão exclusivo da instalação hospedada, estável entre deploys.
+      - key: SECRET_KEY
+        generateValue: true
+      # Na primeira implantação, preencha estes campos diretamente no Render.
+      # O token deve ser de leitura e escrita para o banco específico do site.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

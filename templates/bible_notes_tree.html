@@ -1,0 +1,24 @@
+{# Este painel pertence ao índice do livro. Só o perfil autenticado recebe
+   o editor e consulta a coleção particular pelo servidor. #}
+<section class="note-collection" aria-label="Meus marca-páginas">
+  {% if g.user %}
+  {% if not g.user.disabled %}
+    <button class="note-add" type="button" data-note-create>{{ icon('feather',16) }} Marcar passagem</button>
+  {% else %}
+    <p class="note-empty">Você pode consultar e excluir as marcações deste perfil.</p>
+  {% endif %}
+  <label class="note-search" hidden data-note-search-wrap>
+    <span>Buscar nas marcações</span><input type="search" data-note-search placeholder="Título, passagem ou anotação">
+  </label>
+  <button hidden type="button" class="note-filter" data-note-clear-filter></button>
+  <p class="note-empty" data-note-list-status role="status">Carregando suas marcações…</p>
+  <button hidden type="button" data-note-reload class="note-retry">Tentar novamente</button>
+  <div class="note-folders" data-note-folders></div>
+  <template id="note-edit-icon">{{ icon('feather',15) }}</template>
+  {% else %}
+  <div class="note-guest">{{ icon('bookmark',23) }}<h3>Seus marca-páginas</h3>
+    <p>Entre para grifar passagens e guardar suas anotações neste índice.</p>
+    <a href="{{ url_for('accounts.login', next=request.full_path.rstrip('?')) }}">Entrar na minha conta <span aria-hidden="true">→</span></a>
+  </div>
+  {% endif %}
+</section>

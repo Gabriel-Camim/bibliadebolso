@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='reader.css') }}">{% endblock %}
+{% block content %}
+<header class="reading-heading">
+  <h1>Seu versículo</h1>
+  <details class="appearance"><summary>{{ icon('settings',17) }} Ajustar leitura</summary>
+    <div class="appearance-controls"><label>Fonte<select id="reader-face">
+      <option value="classic">Clássica</option><option value="serif">Serifada</option><option value="sans">Sem serifa</option>
+    </select></label><label>Tamanho<select id="reader-size"><option value="normal">Normal</option><option value="large">Grande</option><option value="larger">Muito grande</option></select></label></div>
+  </details>
+</header>
+<section class="folio" aria-label="Versículo sorteado">
+  <article class="passage">
+    <div class="edition"><span aria-hidden="true"></span> BÍBLIA PORTUGUESA MUNDIAL</div>
+    <div id="reading" aria-live="polite">
+      <blockquote id="verse-text">{{ verse.text }}</blockquote>
+      <p class="reference" id="verse-reference">{{ verse.reference }}</p>
+    </div>
+    <div class="reader-actions">
+      <a class="button primary" id="study-link" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ icon('spark',17) }} Estudar com a IA</a>
+      <button class="button secondary" id="draw" type="button" data-token="{{ csrf_token() }}">{{ icon('refresh',16) }} Novo versículo</button>
+    </div>
+    <div class="passage-links">
+      <a id="bible-link" href="{{ url_for('bible.locate', verse_id=verse.id) }}">{{ icon('book',17) }} Navegar até o versículo</a>
+      {% if draw_token %}
+        <form method="post" action="{{ url_for('library.favorite_draw') }}" data-favorite-form data-verse-id="{{ verse.id }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" id="favorite-receipt" name="draw_token" value="{{ draw_token }}">
+          <button type="submit" data-favorite-button aria-pressed="{{ 'true' if saved else 'false' }}" {% if saved %}disabled{% endif %}>
+            {{ icon('bookmark',17) }} <span data-favorite-label>{{ 'Nos meus favoritos' if saved else 'Favoritar versículo' }}</span>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+    <div id="draw-error" role="status"></div>
+  </article>
+  {# A paisagem, o personagem e a lã de cada ovelha estão em planos separados.
+     O passeio continua entre sorteios. #}
+  <figure class="illustration" id="illustration" aria-label="Jesus com ovelhas em uma colina ao amanhecer">
+    <div class="landscape" aria-hidden="true"></div>
+    <img class="cloud cloud-one" src="/static/personagens/nuvem-creme.png" alt="">
+    <img class="cloud cloud-two" src="/static/personagens/nuvem-ocre.png" alt="">
+    <img id="shepherd" src="/static/personagens/jesus-acolhe.png" alt="">
+    <div class="flock" aria-hidden="true">
+      <span class="lamb-trail trail-one"><img class="lamb lamb-one" src="/static/personagens/ovelha-passo-1.png" alt=""></span>
+      <span class="lamb-trail trail-two"><img class="lamb lamb-two" src="/static/personagens/ovelha-passo-2.png" alt=""></span>
+    </div>
+    <div class="print-frame" aria-hidden="true"></div>
+  </figure>
+</section>
+<div class="folio-note">
+  <a href="https://ebible.org/details.php?id=porbrbsl" rel="external">{{ icon('feather',16) }} Sobre a tradução BPM</a>
+</div>
+{% endblock %}

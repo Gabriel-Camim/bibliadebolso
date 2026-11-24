@@ -1,0 +1,71 @@
+{% from 'icons.html' import icon %}
+{# Os links continuam virando páginas sem JavaScript. Uma abertura avança
+   duas folhas no desktop e uma folha no telefone. Ambos usam o mesmo índice. #}
+{% macro turn_link(link, forward, layout) %}
+  {% set label = ('Próxima página' if forward else 'Página anterior') if layout == 'single' else ('Próximas páginas' if forward else 'Páginas anteriores') %}
+  {% if link %}<a class="leaf-turn leaf-{{ layout }}" href="{{ link }}" data-book-turn="{{ 'next' if forward else 'previous' }}" aria-label="{{ label }}" title="{{ label }}">{{ '›' if forward else '‹' }}</a>
+  {% else %}<span class="leaf-turn leaf-{{ layout }}" aria-hidden="true" data-unavailable>{{ '›' if forward else '‹' }}</span>{% endif %}
+{% endmacro %}
+{% macro folio(number) -%}{{ '{:,}'.format(number).replace(',', '.') }}{%- endmacro %}
+
+  <div class="scripture-desk" data-book-desk data-open-book="{{ book_code }}" data-open-chapter="{{ chapter }}" data-open-verse="{{ selected.start_verse if selected else '' }}" data-page-title="{{ page_title }}">
+    <div class="volume-legend"><span>{{ icon('book',14) }} {{ books[book_code] }} <i>/</i> Capítulo {{ chapter }}</span>
+      <nav class="top-page-turns" aria-label="Navegação no topo do livro">
+        {{ turn_link(previous_spread,false,'double') }}{{ turn_link(previous_leaf,false,'single') }}
+        <span class="leaf-double">{{ folio(spread[0][0].number) }}{% if spread|length == 2 %}–{{ folio(spread[1][0].number) }}{% endif %} de {{ folio(total_pages) }}</span><span class="leaf-single">{{ folio(current.number) }} de {{ folio(total_pages) }}</span>
+        {{ turn_link(next_spread,true,'double') }}{{ turn_link(next_leaf,true,'single') }}
+      </nav>
+    </div>
+    <div class="volume-cover" id="livro" tabindex="-1" aria-label="Livro aberto em {{ books[book_code] }}, capítulo {{ chapter }}">
+      <div class="volume-sheets">
+        {% for leaf, verses in spread %}
+          <article class="volume-page {{ 'verso' if loop.first else 'recto' }}{{ ' leaf-current' if leaf.number == current.number }}"
+                   aria-label="Página {{ leaf.number }}, {{ books[leaf.book] }} {{ leaf.chapter }}" data-page-number="{{ leaf.number }}">
+            <header class="volume-running"><span>{{ books[leaf.book] }}</span><span>{{ leaf.chapter }} · {{ leaf.first }}–{{ leaf.last }}</span></header>
+            {% if leaf.local == 1 %}
+              <div class="volume-opening">
+                <p>{{ books[leaf.book] }}</p><h2>Capítulo {{ leaf.chapter }}</h2>
+                <span aria-hidden="true" class="chapter-flourish">✧</span>
+              </div>
+            {% endif %}
+            <ol class="scripture-verses" role="list">
+              {% for verse in verses %}
+                {% set active = selected and selected.id == verse.id %}
+                {# Duas páginas podem atravessar a fronteira de capítulos. A âncora
+                   curta pertence sempre ao capítulo solicitado pelo leitor. #}
+                <li id="{{ 'v' if leaf.book==book_code and leaf.chapter==chapter else 'p' ~ leaf.number ~ '-v' }}{{ verse.start_verse }}" {% if active %}class="bible-selected"{% endif %}>
+                  <a href="{{ verse_url(leaf.book, leaf.chapter, verse.start_verse) }}" data-select-passage draggable="false"
+                     data-note-book="{{ leaf.book }}" data-note-chapter="{{ leaf.chapter }}" data-note-start="{{ verse.start_verse }}" data-note-end="{{ verse.verse.split('-')[-1] }}" data-note-book-name="{{ books[leaf.book] }}"
+                     title="Selecionar {{ books[leaf.book] }} {{ leaf.chapter }}:{{ verse.verse }}" {% if active %}aria-current="location"{% endif %}><sup>{{ verse.verse }}</sup>{% if verse.text %}{% if leaf.local == 1 and loop.first %}<span class="initial-cap">{{ verse.text[:1] }}</span>{{ verse.text[1:] }}{% else %}{{ verse.text }}{% endif %}{% else %}<em>Sem texto nesta edição.</em>{% endif %}</a>
+                  {% if active and verse.text %}
+                    <div class="verse-tools">
+                      <a class="verse-study" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ icon('feather',14) }} Estudar com a IA</a>
+                      {% if g.user and not g.user.disabled %}
+                        <button type="button" data-note-create>{{ icon('feather',14) }} Anotar</button>
+                        <form method="post" action="{{ url_for('library.favorite_verse', verse_id=verse.id) }}" data-favorite-form data-verse-id="{{ verse.id }}">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <button type="submit" data-favorite-button aria-pressed="{{ 'true' if saved else 'false' }}" {% if saved %}disabled{% endif %}>{{ icon('bookmark',14) }} <span data-favorite-label>{{ 'Nos meus favoritos' if saved else 'Favoritar versículo' }}</span></button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+            <footer class="volume-folio" aria-label="Página {{ folio(leaf.number) }}"><span>{{ folio(leaf.number) }}</span></footer>
+          </article>
+        {% endfor %}
+        {% if spread|length == 1 %}<div class="volume-endpaper" aria-hidden="true">{{ icon('book',36) }}</div>{% endif %}
+      </div>
+      <i aria-hidden="true" class="volume-ribbon"></i>
+    </div>
+    <nav class="leaf-controls" aria-label="Virar páginas">
+      <span class="volume-lamb" aria-hidden="true"><img alt="" src="{{ url_for('static',filename='personagens/ovelha-passo-1.png') }}"><img class="lamb-stride" alt="" src="{{ url_for('static',filename='personagens/ovelha-passo-2.png') }}"></span>
+      <span class="leaf-control-pair">{{ turn_link(previous_spread,false,'double') }}{{ turn_link(previous_leaf,false,'single') }}</span>
+      <div class="leaf-position">
+        <span class="leaf-double">{% if spread|length == 2 %}Páginas {{ folio(spread[0][0].number) }}–{{ folio(spread[1][0].number) }}{% else %}Página {{ folio(current.number) }}{% endif %} de {{ folio(total_pages) }}</span>
+        <span class="leaf-single">Página {{ folio(current.number) }} de {{ folio(total_pages) }}</span>
+      </div>
+      <span class="leaf-control-pair">{{ turn_link(next_spread,true,'double') }}{{ turn_link(next_leaf,true,'single') }}</span>
+    </nav>
+  </div>

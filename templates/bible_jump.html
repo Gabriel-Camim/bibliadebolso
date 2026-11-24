@@ -1,0 +1,6 @@
+<form class="bible-jump" method="get" action="{{ url_for('bible_jump.locate') }}" data-bible-jump>
+  <label for="bible-jump-q">Buscar passagem ou página</label>
+  <div><input id="bible-jump-q" name="q" data-jump-query type="search" required maxlength="80" autocomplete="off"
+              placeholder="João 3:16 ou página 120"><button type="submit" aria-label="Ir para passagem ou página" title="Ir para passagem ou página">→</button></div>
+  <small role="status" data-jump-status></small>
+</form>

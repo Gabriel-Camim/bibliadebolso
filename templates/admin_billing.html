@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Checkout e vendas · bibliadebolso.com{% endblock %}
+{% block content %}
+<section class="account-admin billing-page">
+  <link rel="stylesheet" href="{{ url_for('static', filename='billing.css') }}">
+  <a class="billing-back" href="{{ url_for('accounts.admin_home') }}">← Administração</a>
+  <h1>Checkout e vendas</h1>
+  {# Os valores vêm dos webhooks, inclusive nas renovações automáticas. O
+     valor ajustado desconta estornos e inclui movimentos de contestação. #}
+  <dl class="account-stats billing-stats">
+    <div><dt>Faturamento bruto</dt><dd>{{ metrics.gross_cents|brl }}</dd></div>
+    <div><dt>Reembolsos</dt><dd>{{ metrics.refund_cents|brl }}</dd></div>
+    <div><dt>Contestações</dt><dd>{{ metrics.dispute_cents|brl }}</dd></div>
+    <div><dt>Receita após ajustes</dt><dd>{{ metrics.adjusted_cents|brl }}</dd></div>
+  </dl>
+  <p>{{ 'Ambiente de produção' if live else 'Ambiente de testes' }} · {{ metrics.paid_count }} fatura(s) paga(s). Valores antes das tarifas e dos impostos.</p>
+  <article class="panel billing-settings">
+    <h2>Oferta de assinatura</h2>
+    <p>Preço, nome e descrição valem para novas assinaturas. Os assinantes atuais seguem o plano contratado.</p>
+    {% if not ready %}<p class="billing-status">A cobrança requer as credenciais Stripe e o endereço de retorno configurados no servidor.</p>{% endif %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="revision" value="{{ offer.revision }}">
+      <input type="hidden" name="offer_mode" value="{{ 'live' if live else 'test' }}">
+      <label>Nome exibido na oferta e no checkout
+        <input name="title" value="{{ offer.title }}" maxlength="120" required>
+      </label>
+      <label>Descrição do plano
+        <textarea name="description" maxlength="500" rows="3" required>{{ offer.description }}</textarea>
+      </label>
+      <label>Preço mensal em reais
+        <input name="price" inputmode="decimal" value="{{ '%d,%02d'|format(offer.price_cents // 100, offer.price_cents % 100) }}" required>
+      </label>
+      <label>Mensagem próxima à confirmação do pagamento
+        <textarea name="note" maxlength="400" rows="2">{{ offer.note }}</textarea>
+      </label>
+      <label class="billing-checkbox"><input name="published" type="checkbox" {% if offer.published %}checked{% endif %}> Publicar oferta e aceitar novas assinaturas</label>
+      <button class="button primary">Salvar oferta</button>
+      <a href="{{ url_for('billing.offer') }}">Ver página de assinatura</a>
+    </form>
+  </article>
+  <article class="panel account-table">
+    <h2>Histórico de operações</h2>
+    {% if events %}
+      <div class="account-scroll"><table>
+        <thead><tr><th>Data</th><th>Operação</th><th>Conta</th><th>Valor do evento</th><th>Referência Stripe</th></tr></thead>
+        <tbody>{% for event in events %}
+          <tr><td>{{ event.created|billing_time }}</td><td>{{ labels.get(event.kind,event.kind) }}</td><td>{{ event.user_id or 'Removida' }}</td>
+            <td>{{ event.amount|brl if event.amount is not none else '—' }}</td><td><code>{{ event.reference }}</code></td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+    {% else %}<p>As confirmações da Stripe aparecerão aqui após as primeiras operações.</p>{% endif %}
+    <nav class="account-actions" aria-label="Histórico de operações">
+      {% if page > 1 %}<a href="{{ url_for('billing.admin_checkout', page=page-1) }}">Anterior</a>{% endif %}
+      {% if more %}<a href="{{ url_for('billing.admin_checkout', page=page+1) }}">Próxima</a>{% endif %}
+    </nav>
+  </article>
+</section>
+{% endblock %}
