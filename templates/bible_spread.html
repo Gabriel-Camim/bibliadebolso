@@ -10,6 +10,19 @@
 
   <div class="scripture-desk" data-book-desk data-open-book="{{ book_code }}" data-open-chapter="{{ chapter }}" data-open-verse="{{ selected.start_verse if selected else '' }}" data-page-title="{{ page_title }}">
     <div class="volume-legend"><span>{{ icon('book',14) }} {{ books[book_code] }} <i>/</i> Capítulo {{ chapter }}</span>
+      {% if quick_target and not (g.user and g.user.disabled) %}
+        {% set target_url = verse_url(current.book, current.chapter, quick_target.start_verse) %}
+        {% if g.user %}
+        <form class="bookmark-shortcut" data-quick-bookmark method="post" action="{{ url_for('bible_notes.quick') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="book" value="{{ current.book }}"><input type="hidden" name="chapter" value="{{ current.chapter }}">
+          <input type="hidden" name="start_verse" value="{{ quick_target.start_verse }}">
+          <button data-bookmark-shortcut type="submit" title="Guardar {{ books[current.book] }} {{ current.chapter }}:{{ quick_target.verse }}">{{ icon('bookmark',15) }} <span>Marcar página</span></button>
+        </form>
+        {% else %}
+        <a class="bookmark-shortcut" data-bookmark-shortcut href="{{ url_for('accounts.login', next=target_url) }}" title="Entre para salvar esta página">{{ icon('bookmark',15) }} <span>Marcar página</span></a>
+        {% endif %}
+      {% endif %}
       <nav class="top-page-turns" aria-label="Navegação no topo do livro">
         {{ turn_link(previous_spread,false,'double') }}{{ turn_link(previous_leaf,false,'single') }}
         <span class="leaf-double">{{ folio(spread[0][0].number) }}{% if spread|length == 2 %}–{{ folio(spread[1][0].number) }}{% endif %} de {{ folio(total_pages) }}</span><span class="leaf-single">{{ folio(current.number) }} de {{ folio(total_pages) }}</span>
@@ -17,6 +30,18 @@
       </nav>
     </div>
     <div class="volume-cover" id="livro" tabindex="-1" aria-label="Livro aberto em {{ books[book_code] }}, capítulo {{ chapter }}">
+      {% if open_cover %}
+      {# A capa decorativa gira sobre as folhas reais. A passagem por baixo
+         já pode receber foco, inclusive com JavaScript desativado. #}
+      <div class="book-intro" aria-hidden="true">
+        <div class="opening-board">
+          <div class="board-face">
+            <div class="cover-imprint"><i class="cover-cross"></i><span>Bíblia<br><em>Sagrada</em></span><i class="cover-flourish">✧</i></div>
+          </div>
+          <div class="board-lining"></div>
+        </div>
+      </div>
+      {% endif %}
       <div class="volume-sheets">
         {% for leaf, verses in spread %}
           <article class="volume-page {{ 'verso' if loop.first else 'recto' }}{{ ' leaf-current' if leaf.number == current.number }}"

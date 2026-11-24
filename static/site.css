@@ -51,29 +51,52 @@ h2 {font-size:1.85rem;line-height:1.2;font-weight:500}
 .button:hover {background:#283222}
 .button.secondary {color:#3c4334;background:#fffdf6;border-color:#c6c8b6}
 .button.secondary:hover {background:#ebecdf}
-/* O halo segue a borda do botão sem cobrir o texto nem interceptar cliques.
-   No livro, a criação de uma nova barra de ações reinicia o percurso. */
-.ai-attention {position:relative; isolation:isolate}
-.ai-attention::before,.ai-attention::after {content:"";position:absolute;pointer-events:none}
-.ai-attention::before {
-  inset:-2px;border:1px solid #c6994a;border-radius:inherit;
-  box-shadow:0 0 8px 2px #d8a84675;opacity:0;
-  animation:study-halo 2.15s ease-out 2;
+/* Cada reflexo combina um fio de luz marfim, uma centelha transversal e duas
+   camadas largas de luz âmbar. Todos os gradientes chegam à transparência:
+   o reflexo se dissolve na borda e deixa o rótulo e o clique livres. */
+.ai-attention {
+  position:relative;
+  isolation:isolate;
+  --light-lap:14s;
+  --rim-radius:.52rem;
 }
-@keyframes study-halo {0%,100% {opacity:0} 20% {opacity:.9} 68% {opacity:.25}}
+.verse-study.ai-attention {--rim-radius:5px}
+.study-subscribe.ai-attention {--rim-radius:1.2rem}
+.ai-attention::before,.ai-attention::after {
+  content:"";
+  pointer-events:none;
+  position:absolute;
+  z-index:1;
+  width:clamp(34px,37%,66px);
+  height:24px;
+  top:50%;
+  left:0;
+  transform:translate(-50%,-50%);
+  background:
+    radial-gradient(ellipse 44% 7% at 56% 50%, #fffff4 0%, #fff9dded 18%, #ffdf95ab 52%, transparent 100%),
+    radial-gradient(ellipse 4% 39% at 56% 50%, #fff9dfd6 0%, #ffedb566 38%, transparent 100%),
+    radial-gradient(ellipse 24% 32% at 56% 50%, #fff4bfe8 0%, #ffd57da3 35%, #e8ad4a33 67%, transparent 100%),
+    radial-gradient(ellipse 46% 48% at 48% 50%, #edb35780 0%, #eeb35545 38%, #dca45712 70%, transparent 100%);
+}
+.ai-attention::after {left:100%}
 @supports (offset-path:inset(0 round 8px)) {
-  .ai-attention::after {
-    inset:0 auto auto 0;width:7px;height:7px;border-radius:50%;opacity:0;
-    background:#fff5c7;box-shadow:0 0 3px 2px #f1c664,0 0 9px 3px #d6a4478c;
-    offset-path:inset(0 round 8px);animation:study-orbit 2.15s linear 2;
+  .ai-attention::before,.ai-attention::after {
+    inset:0 auto auto 0;
+    transform:none;
+    /* O eixo longo do reflexo fica tangente ao contorno, inclusive nas curvas.
+       O atraso negativo põe as luzes em extremos opostos já no primeiro quadro. */
+    offset-path:inset(0 round var(--rim-radius)) border-box;
+    offset-anchor:56% 50%;
+    offset-rotate:auto;
+    animation:study-orbit var(--light-lap) linear infinite;
+    animation-delay:calc(-.44 * var(--light-lap));
   }
+  .ai-attention::after {animation-delay:calc(-.94 * var(--light-lap))}
 }
-@keyframes study-orbit {0% {offset-distance:0;opacity:0} 7%,89% {opacity:1} 100% {offset-distance:100%;opacity:0}}
+@keyframes study-orbit {from {offset-distance:0%} to {offset-distance:100%}}
 @media (prefers-reduced-motion:reduce) {
-  /* Uma única volta suave preserva o sinal de estudo sem deslocar o botão
-     nem repetir o efeito para quem reduziu o movimento no sistema. */
-  .ai-attention::before,.ai-attention::after {animation-duration:3.6s;animation-iteration-count:1}
-  .ai-attention::after {box-shadow:0 0 4px 1px #d9b165}
+  .ai-attention {--light-lap:24s}
+  .ai-attention::before,.ai-attention::after {opacity:.8}
 }
 .eyebrow,.edition {display:flex;align-items:center;gap:.55rem;font:650 .76rem/1.5 var(--sans);letter-spacing:.13em;color:#7f633c}
 .reader-intro {display:flex;align-items:end;justify-content:space-between;gap:1rem;margin-bottom:1.4rem}

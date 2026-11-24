@@ -8,7 +8,7 @@ from contextlib import closing
 from time import time
 from uuid import UUID
 
-from flask import Blueprint, abort, jsonify, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, request, url_for
 from werkzeug.exceptions import HTTPException
 
 import corpus
@@ -19,7 +19,8 @@ from core import get_db
 bp = Blueprint("bible_notes", __name__, url_prefix="/biblia/marcacoes")
 COLORS = {"gold", "sage", "rose", "blue", "none"}
 FIELDS = ("id, book, chapter, start_verse, end_verse, start_offset, end_offset, "
-          "excerpt, color, title, body, revision, created_at, updated_at")
+          "excerpt, color, title, body, revision, created_at, updated_at, "
+          "coalesce(request_id GLOB 'quick:*', 0) AS quick")
 
 
 def init_notes(db):
@@ -70,13 +71,14 @@ def require_account():
     user = current_user()
     if user is None:
         abort(401, description="Entre na sua conta para acessar as marcações.")
-    if user["disabled"] and request.endpoint in {"bible_notes.create", "bible_notes.edit"}:
+    if user["disabled"] and request.endpoint in {"bible_notes.create", "bible_notes.quick", "bible_notes.edit"}:
         abort(403, description="Esta conta está suspensa para novas marcações e edições.")
 
 
 def _public(row):
     """Monta a referência exibida na árvore e um link para a passagem."""
     note = dict(row)
+    note["quick"] = bool(note["quick"])
     note["book_name"] = corpus.BOOKS[note["book"]]
     numbers = str(note["start_verse"])
     if note["end_verse"] != note["start_verse"]:
@@ -209,6 +211,34 @@ def create():
             token = str(UUID(str(token)))
         except ValueError:
             abort(422, description="Reabra o formulário para iniciar outra marcação.")
+    note, created = _insert(content, token, user_id)
+    return jsonify(note=note, message="Marcação salva."), 201 if created else 200
+
+
+def quick_key(book, chapter, start, end):
+    """Reserva um espaço por referência no índice privado de cada pessoa."""
+    return f"quick:{book}:{chapter}:{start}:{end}"
+
+
+@bp.post("/rapida")
+def quick():
+    """Guarda o ponto da leitura com um clique, inclusive após reenvios de rede."""
+    fields = _fields()
+    content = _validated({"book":fields.get("book"), "chapter":fields.get("chapter"),
+                          "start_verse":fields.get("start_verse"), "color":"none"})
+    # request_id já tem restrição UNIQUE por usuário. Um duplo clique ou duas
+    # abas no mesmo verso recebem o mesmo registro. O banco aceita em paralelo
+    # anotações livres, cujas chaves são UUIDs (outro espaço de identificadores).
+    note, created = _insert(content, quick_key(*content[:4]), current_user()["id"])
+    message = "Marca-página salvo." if created else "Esta passagem já tem um marca-página."
+    if request.is_json or request.accept_mimetypes.best == "application/json":
+        return jsonify(note=note, message=message), 201 if created else 200
+    flash(message, "toast")
+    return redirect(note["url"], code=303)
+
+
+def _insert(content, token, user_id):
+    """Centraliza a gravação e recupera a mesma marca nos reenvios."""
     now = int(time())
     db = get_db()
     with db:
@@ -223,7 +253,7 @@ def create():
         if not created:
             row = db.execute(f"SELECT {FIELDS} FROM bible_notes WHERE user_id=? AND request_id=?",
                              (user_id, token)).fetchone()
-    return jsonify(note=_public(row), message="Marcação salva."), 201 if created else 200
+    return _public(row), created
 
 
 def _owner_filter(note_id, fields):
@@ -252,6 +282,10 @@ def edit(note_id):
     fields = _fields()
     content = _validated(fields)
     where, params = _owner_filter(note_id, fields)
+    # No marcador rápido a referência é a posição física da fita. O leitor
+    # ainda pode editar título, texto e cor. Outras notas admitem intervalos.
+    where += " AND (request_id IS NULL OR request_id NOT GLOB 'quick:*' OR request_id=?)"
+    params.append(quick_key(*content[:4]) if content[4:6] == (None, None) else "")
     db = get_db()
     with db:
         row = db.execute(f"""UPDATE bible_notes

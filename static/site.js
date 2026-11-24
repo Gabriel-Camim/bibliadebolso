@@ -124,6 +124,40 @@ if (draw) {
   const jesus = scene.querySelector("#shepherd");
   const lamb = scene.querySelector(".lamb-one");
   const studyLink = document.querySelector("#study-link");
+  const bookmark = document.querySelector("[data-draw-bookmark]");
+  const bookmarkForm = bookmark?.querySelector("form");
+  const indexLink = bookmark?.querySelector("a");
+  function displayBookmark(saved) {
+    bookmarkForm.hidden = saved;
+    indexLink.hidden = !saved;
+    bookmarkForm.querySelector("button").disabled = false;
+  }
+  bookmarkForm?.addEventListener("submit", async event => {
+    // Se o usuário sortear de novo durante a gravação, o recibo de sucesso
+    // continua referente à página anterior. Nunca mudamos a fita do novo verso.
+    event.preventDefault();
+    const verseId = bookmark.dataset.verseId;
+    const button = bookmarkForm.querySelector("button");
+    if (button.disabled) return;
+    const hadFocus = document.activeElement === button;
+    button.disabled = true;
+    try {
+      const reply = await fetch(bookmarkForm.action, {method:"POST", body:new FormData(bookmarkForm),
+        headers:{Accept:"application/json"}});
+      if (!reply.ok) throw Error();
+      const result = await reply.json();
+      if (!result.note?.quick) throw Error();
+      if (bookmark.dataset.verseId === verseId) {
+        displayBookmark(true);
+        if (hadFocus && (document.activeElement === document.body || document.activeElement === button))
+          indexLink.focus({preventScroll:true});
+      }
+      showToast(result.message);
+    } catch {
+      if (bookmark.dataset.verseId === verseId) button.disabled = false;
+      showToast("Não foi possível salvar o marca-página. Tente novamente.", true);
+    }
+  });
   let settleTimer;
   // Uma resposta tardia não pode substituir uma leitura mais recente. O botão
   // aguarda a operação, e o link de estudo passa a apontar para o mesmo texto.
@@ -142,6 +176,15 @@ if (draw) {
       // Passagem, favorito e estudo mudam juntos. O recibo preserva o instante
       // deste sorteio para que o perfil exiba a data correta ao salvar.
       document.querySelector("#bible-link").href = verse.bible_url;
+      if (bookmark) {
+        bookmark.hidden = !verse.draw_token;
+        bookmark.dataset.verseId = String(verse.verse_id);
+        bookmarkForm.elements.book.value = verse.book;
+        bookmarkForm.elements.chapter.value = verse.chapter;
+        bookmarkForm.elements.start_verse.value = verse.start_verse;
+        indexLink.href = verse.bookmark_index_url;
+        displayBookmark(verse.bookmarked);
+      }
       const favoriteReceipt = document.querySelector("#favorite-receipt");
       if (favoriteReceipt) {
         favoriteReceipt.value = verse.draw_token || "";

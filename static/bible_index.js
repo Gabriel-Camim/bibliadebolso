@@ -82,6 +82,7 @@
       summary.append(caret, " Capítulo " + n); chapter.append(summary); fragment.append(chapter);
     }
     children.append(fragment);
+    document.dispatchEvent(new Event("bible:index-branch"));
   }
   async function populateChapter(chapter) {
     if (chapter.querySelector(".tree-passages")) return;
@@ -105,6 +106,7 @@
         verses.append(link);
       }
       status.replaceWith(verses);
+      document.dispatchEvent(new Event("bible:index-branch"));
     } catch {
       status.textContent = "Não foi possível carregar os versículos. ";
       const retry = make("button","Tentar novamente"); retry.type = "button";

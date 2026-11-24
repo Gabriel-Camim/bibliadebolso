@@ -1,0 +1,40 @@
+{# showModal() coloca a cena na camada superior do navegador. O JavaScript
+   só pede a primeira ilustração quando alguém realmente entra no tutorial. #}
+<dialog class="welcome-tour" id="welcome-tour" aria-labelledby="tour-title" aria-describedby="tour-copy"
+        data-first="{{ '1' if g.offer_tutorial and request.endpoint and not error else '0' }}"
+        data-seen-url="{{ url_for('tutorial.remember') }}" data-token="{{ csrf_token() }}"
+        data-welcome="{{ url_for('static',filename='personagens/jesus-acolhe.png') }}"
+        data-reading="{{ url_for('static',filename='personagens/jesus-le.png') }}"
+        data-teaching="{{ url_for('static',filename='personagens/jesus-ensina.png') }}"
+        data-listening="{{ url_for('static',filename='personagens/jesus-escuta.png') }}">
+  <header class="tour-head">
+    <span>{{ icon('emblem',20) }} Primeiros passos</span>
+    <button type="button" class="tour-dismiss" data-end-tour>Pular tutorial {{ icon('close',14) }}</button>
+  </header>
+  <div class="tour-main">
+    <div class="tour-scene" aria-hidden="true">
+      <div class="tour-window"></div>
+      <img data-tour-portrait alt="" width="240" height="290">
+    </div>
+    <div class="tour-lesson">
+      <p class="tour-phase" data-tour-phase></p>
+      <h2 id="tour-title" tabindex="-1"></h2>
+      <p id="tour-copy"></p>
+      <div class="tour-example" data-tour-example>
+        <span aria-hidden="true" class="tour-booklet"><i></i><b>✧</b></span>
+        <div class="tour-example-content">
+          <p class="tour-example-reference" data-example-label></p>
+          <p class="tour-example-text" data-example-content aria-live="polite"></p>
+          <button type="button" class="tour-demo-button" data-try-example></button>
+        </div>
+      </div>
+      <button type="button" class="tour-find" data-find-action hidden>Mostrar na página <span aria-hidden="true">↗</span></button>
+    </div>
+  </div>
+  <nav class="tour-route" aria-label="Etapas do tutorial"><ol></ol></nav>
+  <footer class="tour-controls">
+    <button type="button" class="tour-prev" aria-label="Etapa anterior" title="Etapa anterior" data-tour-back>←</button>
+    <button type="button" class="tour-skip" data-skip-stage>Pular etapa</button>
+    <button type="button" class="tour-next" data-tour-next>Continuar <span aria-hidden="true">→</span></button>
+  </footer>
+</dialog>

@@ -16,8 +16,10 @@
   <title>{% block title %}bibliadebolso.com · Leitura bíblica{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static',filename='site.css') }}">
   <link rel="stylesheet" href="{{ url_for('static',filename='accounts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static',filename='tutorial.css') }}">
   {% block head %}{% endblock %}
   <script defer src="{{ url_for('static',filename='site.js') }}"></script>
+  <script defer src="{{ url_for('static',filename='tutorial.js') }}"></script>
 </head>
 <body data-view="{{ request.endpoint }}">
   <a class="skip" href="#conteudo">Pular para o conteúdo</a>
@@ -43,7 +45,7 @@
     {% block content %}{% endblock %}
   </main>
   <footer class="site-foot"><span>{{ icon('book',17) }} Bíblia de Bolso</span>
-    <nav aria-label="Rodapé"><a href="/sobre">Sobre a IA</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><button type="button" data-cookies-open>Cookies</button></nav>
+    <nav aria-label="Rodapé"><button type="button" data-replay-tutorial hidden>Rever tutorial</button><a href="/sobre">Sobre a IA</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><button type="button" data-cookies-open>Cookies</button></nav>
   </footer>
   {# O aviso permanece no fluxo da página e não bloqueia a leitura do versículo. #}
   <aside class="cookie-box" id="cookie-box" aria-label="Preferências de cookies" {% if session.get('cookie_choice') %}hidden{% endif %}>
@@ -54,4 +56,5 @@
     </form>
   </aside>
   {% block scripts %}{% endblock %}
+  {% include 'tutorial.html' %}
 </body></html>

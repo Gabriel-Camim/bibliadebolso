@@ -43,6 +43,22 @@
 .note-row {display:flex;align-items:start;gap:.15rem;padding:.2rem 0 .35rem .1rem;}
 .note-row > a {display:grid;grid-template-columns:.7rem 1fr;gap:.1rem .4rem;min-width:0;flex:1;text-decoration:none;padding:.27rem 0;line-height:1.3;}
 .note-row > a:hover strong {text-decoration:underline;}
+.note-row > a[aria-current=location] {background:#e8eddd;border-radius:3px}
+.note-dot.quick-ribbon {background:#a45538;border-color:#82472e}
+[data-bookmark-count] {padding:.12em .38em;border-radius:.3rem;background:#d8ddc8;color:#40513b;font-size:.68rem}
+.bible-tree summary[data-with-bookmarks]::after,.verse-grid a[data-with-bookmarks]::after {
+  content:"";width:6px;height:11px;background:#a76441;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);pointer-events:none;
+}
+.bible-tree summary[data-with-bookmarks]::after {margin-left:auto;margin-right:.35rem;flex:none}
+.verse-grid a[data-with-bookmarks] {position:relative}
+.verse-grid a[data-with-bookmarks]::after {position:absolute;right:2px;top:0;width:4px;height:7px}
+.verse-grid a[data-with-bookmarks][aria-current=location]::after {background:#f4d69a}
+.tree-passages .chapter-marks {
+  display:block;padding:.3rem .35rem;margin:.14rem 0;border-radius:.25rem;background:#eee4cf;color:#69492e;
+  font:600 .72rem/1.3 var(--sans);text-align:left;
+}
+.chapter-marks:hover {text-decoration:underline}
 .note-row strong,.note-row small {overflow-wrap:anywhere;}
 .note-row strong {font-size:.81rem;color:#394633;}
 .note-row small {grid-column:2;color:#676a59;font:.72rem/1.4 var(--sans);}

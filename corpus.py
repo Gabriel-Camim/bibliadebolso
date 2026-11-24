@@ -83,7 +83,9 @@ def _public(row):
     return record
 
 
-FIELDS = "id, book_code, chapter, verse, text"
+# Uma referência impressa pode reunir dois versos. As posições numéricas
+# mantêm a fita do leitor e o índice alinhados com a passagem inteira.
+FIELDS = "id, book_code, chapter, verse, start_verse, end_verse, text"
 
 
 def verse_by_id(verse_id):

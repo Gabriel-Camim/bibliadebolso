@@ -68,6 +68,15 @@ class BibleBrowserFlow(TestCase):
         # Os links vizinhos respeitam os extremos da edição e cruzam a fronteira entre livros.
         first = self.client.get("/biblia", follow_redirects=True)
         self.assertEqual(first.request.path, "/biblia/GEN/1")
+        self.assertIn('class="book-intro"',first.get_data(as_text=True))
+        self.assertIn('data-bookmark-shortcut',first.get_data(as_text=True))
+        # A animação de entrada e o atalho de cadastro não desorientam quem
+        # chegou pelo NFC, pela árvore de livros ou por um marcador pessoal.
+        deep = self.client.get("/biblia/JHN/3?versiculo=16").get_data(as_text=True)
+        self.assertNotIn('class="book-intro"', deep)
+        self.assertIn('title="Entre para salvar esta página"', deep)
+        fragment = self.client.get("/biblia/GEN/1?abrir=1", headers={"X-Bible-Chapter":"GEN/1"})
+        self.assertNotIn('class="book-intro"', fragment.get_data(as_text=True))
         printed = PrintedPages(first.get_data(as_text=True))
         self.assertEqual(printed.pages, [1, 2])
         self.assertEqual(printed.current, 1)

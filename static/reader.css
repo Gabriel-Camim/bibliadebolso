@@ -6,6 +6,13 @@ body[data-view="reader"] .main-shell {margin-top:clamp(1.5rem,3vw,3rem);min-heig
 .reading-heading h1 {margin:0;font-size:clamp(2.5rem,4.6vw,4.25rem);line-height:1.01;letter-spacing:-.063em}
 .folio {display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);position:relative;isolation:isolate;background:#fbf7eb url(papel.png);border:1px solid #b8ae92;border-radius:6px 12px 12px 6px;box-shadow:0 3px 0 -1px #efeadb,0 4px 0 -1px #c4baa2,0 7px 0 -2px #eee9d9,0 8px 0 -2px #c5bca7,0 19px 38px -27px #353724}
 .passage {padding:clamp(1.9rem,4vw,4.5rem);align-self:center;min-width:0}
+.folio-heading {display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}
+.folio-bookmark :is(button,a) {display:inline-flex;align-items:center;gap:.45rem;min-height:40px;padding:0 .15rem;background:transparent;color:#62543b;font:600 .78rem/1.3 var(--sans);text-decoration:none}
+.folio-bookmark :is(button,a):hover {text-decoration:underline}
+/* O corte em V e a trama acompanham o desenho da fita no livro. O nome da
+   ação continua como texto mesmo no celular e com imagens desabilitadas. */
+.folio-bookmark :is(button,a)::before {content:"";width:12px;height:20px;background:repeating-linear-gradient(90deg,#fff4ca25 0 1px,transparent 1px 3px),linear-gradient(90deg,#8e683b,#bd924e 50%,#856136);clip-path:polygon(0 0,100% 0,100% 100%,50% 77%,0 100%);opacity:.8}
+.folio-bookmark a::before {background:linear-gradient(90deg,#3a5543,#70836a 50%,#405d4b);opacity:1}
 .passage .edition {font-size:.73rem;letter-spacing:.14em;color:#79623e}
 .edition span {width:2.2rem;height:1px;background:#a38451}
 .passage blockquote {font:500 var(--reading-size,clamp(2rem,2.85vw,3.25rem))/1.23 var(--reading-face,var(--serif));letter-spacing:-.035em;margin:clamp(1.6rem,3.2vw,3rem) 0 1rem;text-wrap:pretty;overflow-wrap:anywhere}

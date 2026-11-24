@@ -1,0 +1,126 @@
+/* O papel do guia flutua sobre a leitura. O personagem está em primeiro
+   plano, à frente da paisagem, da moldura dourada e da sombra de contato. */
+.welcome-tour {
+  position:fixed;inset:0;margin:auto;padding:0;width:min(46rem,calc(100% - 2rem));
+  max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain;
+  color:#343328;background:#fbf8ed url(papel.png);border:1px solid #d7c6a4;
+  border-radius:1rem;box-shadow:0 26px 100px #11190cab,0 3px 12px #181f1638;
+}
+.welcome-tour[open] {animation:tour-enter .28s ease-out both}
+.welcome-tour::backdrop {background:rgb(24 29 20 / .76);backdrop-filter:blur(3px)}
+html.tour-active {overflow:hidden}
+/* A camada modal nativa bloqueia clique e teclado atrás dela. Também
+   paramos as animações da paisagem e das páginas na posição em que estavam. */
+.tour-active body > :not(.welcome-tour),
+.tour-active body > :not(.welcome-tour) *,
+.tour-active body > :not(.welcome-tour) *::before,
+.tour-active body > :not(.welcome-tour) *::after {animation-play-state:paused!important}
+.welcome-tour button {color:inherit;font:inherit}
+.tour-head,.tour-controls {display:flex;align-items:center;gap:.5rem;padding:1rem 1.35rem}
+.tour-head {justify-content:space-between;border-bottom:1px solid #ded6c4}
+.tour-head > span {display:flex;align-items:center;gap:.55rem;font:600 1.18rem var(--serif);color:#444833}
+.tour-head > span svg {color:#8d6e3a}
+.tour-dismiss,.tour-skip,.tour-find,.tour-prev {background:transparent}
+.welcome-tour .tour-dismiss,.welcome-tour .tour-skip,.welcome-tour .tour-find {font:600 .78rem/1.35 var(--sans)}
+.tour-dismiss,.tour-skip {display:inline-flex;align-items:center;gap:.35rem;min-height:36px;padding:.35rem}
+.tour-dismiss:hover,.tour-skip:hover,.tour-find:hover {text-decoration:underline;text-underline-offset:.2em}
+.tour-main {
+  display:grid;grid-template-columns:minmax(0,.74fr) minmax(0,1.35fr);align-items:stretch;
+  gap:clamp(1.3rem,4vw,2.3rem);padding:1.5rem 1.65rem 1rem;
+}
+.tour-scene {position:relative;isolation:isolate;min-height:15rem;align-self:stretch;display:grid;align-items:end;justify-items:center}
+.tour-window {
+  position:absolute;inset:.2rem 0 .3rem;overflow:hidden;z-index:-1;
+  border-radius:55% 55% .5rem .5rem / 40% 40% .5rem .5rem;
+  background:linear-gradient(180deg,#fff6de38 0%,#9b83442b 64%,#5a614071),url(colinas-galileia.jpg) 48% 64% / auto 102%;
+  border:1px solid #c3ad78;box-shadow:inset 0 0 24px #72572b20;
+}
+.tour-window::before {
+  content:"";position:absolute;inset:5px;border:1px solid #fff0bca6;border-radius:inherit;
+}
+.tour-scene::after {content:"";position:absolute;z-index:-1;bottom:6%;width:56%;height:5%;border-radius:50%;background:#43422a42;filter:blur(5px)}
+.tour-scene img {
+  display:block;width:min(100%,14rem);height:100%;max-height:18rem;min-height:0;object-fit:contain;
+  object-position:center bottom;padding:0 5% 6%;filter:drop-shadow(0 5px 2px #45382244);
+}
+.tour-scene img.tour-pose-enter {animation:tour-pose .35s ease-out}
+.tour-lesson {align-self:center;min-width:0;padding-block:.4rem}
+.tour-lesson .tour-phase,.tour-example-reference {
+  margin:0 0 .5rem;text-transform:uppercase;letter-spacing:.12em;
+  color:#785a2e;font:700 .68rem/1.45 var(--sans);
+}
+.tour-lesson h2 {margin:0 0 .65rem;font:500 clamp(1.85rem,4.6vw,2.7rem)/1.02 var(--serif);letter-spacing:-.045em;text-wrap:balance}
+.tour-lesson h2:focus {outline:0}
+#tour-copy {font-size:.94rem;line-height:1.58;margin:0;color:#595949;text-wrap:pretty}
+.tour-example {
+  display:flex;align-items:center;gap:.8rem;min-height:6.8rem;margin-top:1.1rem;
+  border:1px solid #d9cfae;border-left:3px solid #ad8e4e;border-radius:.25rem .55rem .55rem .25rem;
+  padding:.75rem .85rem;background:linear-gradient(135deg,#f8f4e7,#f1ecd9);
+}
+.tour-example-content {min-width:0}
+.tour-example-reference {font-size:.61rem;letter-spacing:.095em;margin:0 0 .2rem;color:#646447}
+.tour-example-text {font:500 1rem/1.32 var(--serif);margin:0 .1rem .4rem 0}
+.welcome-tour .tour-demo-button {
+  display:inline-flex;align-items:center;gap:.4rem;min-height:32px;padding:.3rem .6rem;
+  font:650 .75rem/1.3 var(--sans);border:1px solid #adaf96;color:#404a35;background:#fcfaf1;border-radius:.36rem;
+}
+.tour-demo-button:hover {background:#e9eddb}
+.tour-demo-button svg {width:14px;height:14px;flex-shrink:0}
+.tour-demo-button[aria-pressed=true] {border-color:#899b70;background:#e2e9d4}
+.tour-find {padding:.45rem .1rem .1rem;color:#5f654b!important;min-height:32px}
+.tour-find span {margin-left:.2rem}
+/* A pequena capa pertence à demonstração. Abri-la não muda a referência
+   real por trás do tutorial nem grava histórico em nome do leitor. */
+.tour-booklet {
+  display:none;position:relative;width:2.7rem;height:3.75rem;flex:0 0 auto;
+  background:repeating-linear-gradient(#e5d9b6 0 2px,#fbf6e7 2px 4px);
+  border:1px solid #9d926f;border-radius:2px 4px 4px 2px;perspective:120px;
+}
+.tour-example[data-kind=bible] .tour-booklet {display:block}
+.tour-booklet b {position:absolute;inset:-1px 1px 0 -1px;display:grid;place-items:center;transform-origin:left;
+  background:linear-gradient(90deg,#394230 9%,#56614a 13%,#424e38 23%,#303e2f);
+  border:1px solid #7a805e;border-radius:inherit;color:#efdaad;font:1.3rem var(--serif);transition:transform .85s ease-in-out}
+.tour-example[data-tried] .tour-booklet b {transform:rotateY(-124deg)}
+.tour-route {padding:0 1.65rem}
+.tour-route ol {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.3rem;list-style:none;margin:0;padding:0}
+.tour-route li {min-width:0}
+.tour-route button {
+  display:block;width:100%;padding:.6rem 0 .42rem;border-radius:0;background:none;
+  border-bottom:3px solid #dcd6c4;font:550 .72rem/1.35 var(--sans);color:#646555;
+}
+.tour-route button[data-past] {border-color:#b9aa80}
+.tour-route button[aria-current=step] {color:#4c472e;border-color:#9b7736;font-weight:750}
+.tour-controls {padding:.85rem 1.6rem 1.1rem}
+.tour-prev {font-size:1.1rem!important;border:1px solid #c9c7b1;border-radius:50%;width:36px;height:36px;line-height:1}
+.tour-prev:disabled {opacity:.3}
+.tour-skip {margin-left:auto}
+.welcome-tour .tour-next {
+  padding:.58rem .85rem;min-height:39px;display:flex;align-items:center;gap:.7rem;
+  background:#42503c;color:#fffced;border:1px solid #354333;border-radius:.45rem;font:600 .84rem/1 var(--sans)
+}
+.tour-next:hover {background:#33422e}
+.tour-target {outline:3px solid #b29145!important;outline-offset:4px}
+@keyframes tour-enter {from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)}}
+@keyframes tour-pose {from{opacity:.6;transform:translateY(5px)} to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px) {
+  .welcome-tour {width:min(26rem,calc(100% - 1.15rem));max-height:calc(100dvh - 1rem)}
+  .tour-head {padding:.55rem .9rem}
+  .tour-head > span {font-size:1.05rem}
+  .tour-main {display:block;padding:.75rem 1rem .35rem}
+  .tour-scene {height:clamp(6rem,18dvh,9rem);min-height:0;margin:0 0 .65rem}
+  .tour-window {inset:8% 0 0;border-radius:60% 60% .35rem .35rem / 65% 65% .35rem .35rem;background-size:cover;background-position:center 57%}
+  .tour-scene img {width:auto;height:100%;padding:0 0 .2rem;max-width:62%}
+  .tour-scene::after {width:30%;bottom:2%;height:5%}
+  .tour-lesson {padding-block:.2rem}
+  .tour-lesson .tour-phase {margin-bottom:.35rem}
+  .tour-lesson h2 {font-size:1.9rem;margin-bottom:.4rem}
+  #tour-copy {font-size:.87rem;line-height:1.45}
+  .tour-example {min-height:0;margin-top:.7rem;padding:.55rem .7rem}
+  .tour-route {padding:0 1rem}
+  .tour-route button {font-size:.66rem;min-height:35px}
+  .tour-controls {padding:.65rem 1rem .7rem}
+}
+@media(prefers-reduced-motion:reduce) {
+  .welcome-tour[open],.tour-scene img.tour-pose-enter {animation:none}
+  .tour-booklet b {transition:none}
+}

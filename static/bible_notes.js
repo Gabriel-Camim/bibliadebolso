@@ -92,8 +92,11 @@
       const link = element("a");
       link.href = note.url;
       link.dataset.selectPassage = "";
+      link.dataset.noteLink = note.id;
+      if (active?.hasAttribute("aria-current") && overlaps(note,passage(active))) link.setAttribute("aria-current","location");
       const dot = element("span","note-dot");
       dot.dataset.tone = note.color;
+      dot.classList.toggle("quick-ribbon",note.quick);
       dot.setAttribute("aria-hidden","true");
       link.append(dot,element("strong","",note.title || note.reference));
       if (note.title || note.body || note.excerpt) link.append(element("small","",note.title ? note.reference : (note.body || note.excerpt).slice(0,65)));
@@ -111,10 +114,120 @@
     tree.replaceChildren(fragment);
     const clear = panel.querySelector("[data-note-clear-filter]");
     clear.hidden = !passageFilter;
-    if (passageFilter) clear.textContent = reference(passageFilter) + " ×";
+    if (passageFilter) clear.textContent = (passageFilter.wholeChapter
+      ? passageFilter.book_name + " " + passageFilter.chapter : reference(passageFilter)) + " ×";
     if (loaded) listStatus.textContent = count ? "" : notes.length ? "Nenhuma marcação encontrada." :
-      readOnly ? "Nenhuma marcação salva." : "Selecione um versículo ou arraste sobre uma frase para criar seu primeiro marca-página.";
+      readOnly ? "Nenhuma marcação salva." : "Use “Marcar página” no livro para voltar a este ponto depois.";
   }
+
+  function showBookmarks(entry, id) {
+    // A aba pessoal mostra cada referência com um trecho, agrupada na ordem
+    // do livro. No celular o mesmo comando abre a gaveta de navegação.
+    passageFilter = entry;
+    filter.value = "";
+    renderTree();
+    document.dispatchEvent(new Event("bible:show-notes"));
+    if (id) {
+      const link = tree.querySelector('[data-note-link="' + id + '"]');
+      if (link) {
+        link.focus({preventScroll:true});
+        link.scrollIntoView({block:"nearest"});
+      }
+    }
+  }
+
+  function paintIndex() {
+    // Os livros estão sempre na árvore. Capítulos e versículos são montados
+    // sob demanda; refazemos só os indicadores dos ramos existentes no DOM.
+    const books = document.querySelector(".bible-tree");
+    const total = document.querySelector("[data-bookmark-count]");
+    total.hidden = !notes.length;
+    total.textContent = notes.length;
+    const byBook = new Map();
+    for (const note of notes) {
+      if (!byBook.has(note.book)) byBook.set(note.book,new Map());
+      const chapters = byBook.get(note.book);
+      if (!chapters.has(note.chapter)) chapters.set(note.chapter,[]);
+      chapters.get(note.chapter).push(note);
+    }
+    for (const book of books.querySelectorAll("[data-tree-book]")) {
+      const chapters = byBook.get(book.dataset.treeBook);
+      book.firstElementChild.toggleAttribute("data-with-bookmarks",Boolean(chapters));
+      for (const branch of book.querySelectorAll("[data-chapter]")) {
+        const marks = chapters?.get(Number(branch.dataset.chapter)) || [];
+        branch.firstElementChild.toggleAttribute("data-with-bookmarks",Boolean(marks.length));
+        const passages = branch.querySelector(".tree-passages");
+        if (!passages) continue;
+        let jump = passages.querySelector("[data-chapter-marks]");
+        if (!marks.length) jump?.remove();
+        else {
+          if (!jump) {
+            jump = element("button","chapter-marks");
+            jump.type = "button";
+            jump.dataset.chapterMarks = "";
+            passages.insertBefore(jump,passages.firstChild);
+          }
+          jump.textContent = marks.length + (marks.length === 1 ? " marca-página" : " marca-páginas") + " ↗";
+        }
+        for (const link of passages.querySelectorAll(".verse-grid a")) {
+          const verse = Number(link.hash.slice(2));
+          const marked = marks.some(note=>verse >= note.start_verse && verse <= note.end_verse);
+          link.toggleAttribute("data-with-bookmarks",marked);
+          if (marked) link.setAttribute("aria-description","Passagem com marca-página.");
+          else link.removeAttribute("aria-description");
+        }
+      }
+    }
+  }
+
+  function paintShortcut() {
+    const shortcut = document.querySelector("[data-quick-bookmark]");
+    if (!shortcut) return;
+    const loc = shortcut.elements;
+    const note = notes.find(item => item.quick && item.book === loc.book.value &&
+      item.chapter === Number(loc.chapter.value) && item.start_verse === Number(loc.start_verse.value));
+    const button = shortcut.querySelector("button");
+    button.toggleAttribute("data-saved",Boolean(note));
+    button.querySelector("span").textContent = note ? "Ver marca-página" : "Marcar página";
+    if (note) button.title = "Ver " + note.reference + " no índice";
+    else button.title = "Guardar esta passagem no índice";
+    return note;
+  }
+
+  // Mesmo botão, dois estados: guardar sem sair do livro, e visitar a fita
+  // no índice. Mesmo que a conexão caia, repetir a ação mantém uma só fita.
+  document.addEventListener("submit", async event => {
+    const shortcut = event.target.closest("[data-quick-bookmark]");
+    if (!shortcut) return;
+    event.preventDefault();
+    const button = shortcut.querySelector("button");
+    if (button.disabled) return;
+    const saved = paintShortcut();
+    if (saved) {showBookmarks(saved,saved.id);return;}
+    button.disabled = true;
+    try {
+      const response = await fetch(shortcut.action,{method:"POST",headers:{Accept:"application/json"},body:new FormData(shortcut)});
+      if (!response.headers.get("Content-Type")?.includes("application/json")) throw Error("Entre novamente para marcar a página.");
+      const result = await response.json();
+      if (!response.ok) throw Error(result.message || "Não foi possível guardar a página.");
+      ++listRequest;
+      notes = notes.filter(note=>note.id !== result.note.id);
+      notes.push(result.note);
+      loaded = true;
+      paint();renderTree();notify(result.message);
+      await loadNotes();
+    } catch (error) {
+      notify(error instanceof TypeError ? "Sem conexão. Tente marcar a página novamente." : error.message,true);
+    } finally {button.disabled = false;}
+  });
+  document.addEventListener("bible:index-branch",paintIndex);
+  document.addEventListener("click",event=>{
+    const link = event.target.closest("[data-chapter-marks]");
+    if (!link) return;
+    const book = link.closest("[data-tree-book]").dataset;
+    showBookmarks({book:book.treeBook,book_name:book.bookName,chapter:Number(link.closest("[data-chapter]").dataset.chapter),
+      start_verse:1,end_verse:999,wholeChapter:true});
+  });
 
   // O texto do acervo pode ter capitular e números em sobrescrito. Os offsets
   // são medidos somente nas palavras, em pontos de código Unicode como no Python.
@@ -161,6 +274,8 @@
     }
   }
   function paint() {
+    paintIndex();
+    paintShortcut();
     for (const link of allPassages()) {
       const matches = notes.filter(note=>overlaps(note,passage(link)));
       paintVerse(link,matches);
@@ -284,7 +399,7 @@
     dialog.querySelector("#note-editor-title").textContent = readOnly ? "Marca-página" : entry.id ? "Editar marcação" : "Marcar passagem";
     fields.title.readOnly = readOnly;
     fields.body.readOnly = readOnly;
-    fields.start_verse.disabled = fields.end_verse.disabled = readOnly;
+    fields.start_verse.disabled = fields.end_verse.disabled = readOnly || Boolean(entry.quick);
     for (const color of form.querySelectorAll("[name=color]")) color.disabled = readOnly;
     form.querySelector(".note-save").hidden = readOnly;
     if (readOnly) {

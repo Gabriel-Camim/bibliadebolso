@@ -124,3 +124,34 @@ class BibleNotes(TestCase):
         with self.app.app_context():
             owners = [row[0] for row in get_db().execute("SELECT user_id FROM bible_notes")]
         self.assertEqual(owners, [2])
+
+    def test_quick_bookmarks_are_private_repeatable_and_editable_in_the_same_index(self):
+        quick = self.path + "/rapida"
+        fields = {"book":"GEN", "chapter":1, "start_verse":3}
+        headers = {"X-CSRF-Token":"sessao-de-teste"}
+        self.assertEqual(self.guest.post(quick, json=fields, headers=headers).status_code, 401)
+        self.assertEqual(self.a.post(quick, json=fields).status_code, 400)
+        first = self.a.post(quick, json=fields, headers=headers)
+        again = self.a.post(quick, json=fields, headers=headers)
+        self.assertEqual((first.status_code, again.status_code), (201, 200))
+        note = first.json["note"]
+        self.assertEqual(note, again.json["note"])
+        self.assertTrue(note["quick"])
+        self.assertTrue(note["excerpt"])
+        self.assertEqual(note["url"], "/biblia/GEN/1?versiculo=3#v3")
+        self.assertEqual(self.a.get(self.path).json["notes"], [note])
+        self.assertEqual(self.b.get(self.path).json["notes"], [])
+        self.assertNotEqual(self.b.post(quick, json=fields, headers=headers).json["note"]["id"], note["id"])
+        resource = f"{self.path}/{note['id']}"
+        edited = self.a.post(resource, json={**fields,"title":"Continuar aqui"}, headers=headers)
+        self.assertEqual(edited.json["note"]["title"], "Continuar aqui")
+        self.assertEqual(self.a.post(resource, json={**fields,"start_verse":2}, headers=headers).status_code, 409)
+        self.assertEqual(self.a.post(resource+"/excluir", json={"revision":2}, headers=headers).status_code, 200)
+        # O formulário HTML também funciona sem JavaScript e volta ao verso exato.
+        html = self.a.post(quick, data={**fields, "csrf_token":"sessao-de-teste"})
+        self.assertEqual((html.status_code, html.location), (303, note["url"]))
+        with self.app.app_context():
+            db = get_db()
+            with db:
+                db.execute("UPDATE users SET disabled=1 WHERE id=1")
+        self.assertEqual(self.a.post(quick, json=fields, headers=headers).status_code, 403)

@@ -14,7 +14,7 @@ from werkzeug.exceptions import HTTPException
 ROOT = Path(__file__).resolve().parent
 # Incremente ao acrescentar uma migração em qualquer init_* abaixo. A versão
 # só é registrada após todas as tabelas, colunas e índices ficarem prontos.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 # Em produção, as variáveis fornecidas pela hospedagem têm prioridade sobre o .env.
 load_dotenv(ROOT / ".env")
 
@@ -31,6 +31,7 @@ import core
 import corpus
 import library
 import study
+import tutorial
 
 
 def session_key(directory):
@@ -157,7 +158,7 @@ def create_app(config=None):
     app.teardown_appcontext(core.close_db)
     app.jinja_env.globals["csrf_token"] = core.csrf_token
     for blueprint in (accounts.bp, facebook_auth.bp, password_auth.bp, billing.bp, study.bp,
-                      bible_browser.bp, library.bp, bible_notes.bp, bible_jump.bp):
+                      bible_browser.bp, library.bp, bible_notes.bp, bible_jump.bp, tutorial.bp):
         app.register_blueprint(blueprint)
 
     with app.app_context():
@@ -181,6 +182,24 @@ def create_app(config=None):
         # veio o favorito e a hora em que a leitura foi gerada.
         return verse, library.record_draw(verse)
 
+    def draw_marks(verse, receipt):
+        """Lê os dois estados privados da folha em uma só viagem ao Turso."""
+        if not receipt:
+            return False, False
+        owner = accounts.current_user()["id"]
+        key = bible_notes.quick_key(verse["book_code"], verse["chapter"],
+                                   verse["start_verse"], verse["end_verse"])
+        flags = core.get_db().execute("""
+            SELECT EXISTS(SELECT 1 FROM library_favorites WHERE user_id=? AND verse_id=?),
+                   EXISTS(SELECT 1 FROM bible_notes WHERE user_id=? AND request_id=?)
+        """, (owner, verse["id"], owner, key)).fetchone()
+        return bool(flags[0]), bool(flags[1])
+
+    def bookmark_index_url(verse):
+        """Abre a aba de marca-páginas junto ao capítulo que originou a fita."""
+        return url_for("bible.chapter", book_code=verse["book_code"], chapter=verse["chapter"],
+                       versiculo=verse["start_verse"], indice="notas", _anchor="indice-biblico")
+
     @app.get("/saude")
     def health():
         """A hospedagem confere a conexão SQLite sem contar uma visita ou sortear um verso."""
@@ -198,15 +217,18 @@ def create_app(config=None):
             verse, receipt = corpus.verse_by_id(resume[1]), resume[2]
         else:
             verse, receipt = draw_verse(opened=True)
-        return render_template("reader.html", verse=verse, draw_token=receipt,
-                               saved=bool(receipt) and library.is_favorite(verse["id"]))
+        saved, bookmarked = draw_marks(verse, receipt)
+        return render_template("reader.html", verse=verse, draw_token=receipt, saved=saved,
+                               bookmarked=bookmarked, bookmark_index_url=bookmark_index_url(verse))
 
     @app.post("/leitor/novo")
     def next_verse():
         verse, receipt = draw_verse(opened=False)
+        saved, bookmarked = draw_marks(verse, receipt)
         return jsonify(text=verse["text"], reference=verse["reference"], verse_id=verse["id"],
-                       saved=bool(receipt) and library.is_favorite(verse["id"]),
-                       draw_token=receipt,
+                       saved=saved, bookmarked=bookmarked, draw_token=receipt,
+                       book=verse["book_code"], chapter=verse["chapter"], start_verse=verse["start_verse"],
+                       bookmark_index_url=bookmark_index_url(verse),
                        bible_url=url_for("bible.locate", verse_id=verse["id"]),
                        study_url=url_for("study.start", verse_id=verse["id"]))
 
@@ -228,8 +250,10 @@ def create_app(config=None):
         # Voltamos apenas a uma página local conhecida, sem redirecionamento externo.
         safe = target in {"/","/sobre","/privacidade","/termos","/cadastro","/entrar","/conta","/assinatura","/estudo"}
         if request.accept_mimetypes.best == "application/json":
-            return jsonify(choice=choice)
-        return redirect(target if safe else "/")
+            response = jsonify(choice=choice)
+        else:
+            response = redirect(target if safe else "/")
+        return tutorial.sync_preference_cookie(response)
 
     @app.after_request
     def response_headers(response):

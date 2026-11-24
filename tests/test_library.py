@@ -106,6 +106,29 @@ class PersonalLibrary(TestCase):
         self.first.get("/")
         self.assertEqual(self.rows("SELECT sum(verses) FROM daily_metrics"), [(2,)])
 
+    def test_ribbon_on_nfc_page_and_bible_index_share_one_private_bookmark(self):
+        # Os dois atalhos apontam para a mesma marca por perfil. O leitor
+        # recebe os estados de favorito e de marca-página separadamente.
+        self.assertNotIn("data-draw-bookmark", self.visitor.get("/").get_data(as_text=True))
+        html = self.first.get("/").get_data(as_text=True)
+        self.assertIn("data-draw-bookmark", html)
+        self.assertIn('action="/biblia/marcacoes/rapida"', html)
+        verse = self.post(self.first, "/leitor/novo").json
+        self.assertFalse(verse["bookmarked"])
+        mark = self.first.post("/biblia/marcacoes/rapida", data={
+            "book":verse["book"], "chapter":verse["chapter"], "start_verse":verse["start_verse"],
+            "csrf_token":"csrf-de-teste-1",
+        }, headers={"Accept":"application/json"})
+        self.assertEqual(mark.status_code, 201)
+        self.assertTrue(mark.json["note"]["quick"])
+        same = self.post(self.first, "/leitor/novo").json
+        self.assertTrue(same["bookmarked"])
+        self.assertFalse(same["saved"])
+        self.assertIn("indice=notas", same["bookmark_index_url"])
+        self.assertEqual(self.first.get(same["bookmark_index_url"]).status_code, 200)
+        self.assertEqual(self.first.get("/biblia/marcacoes").json["notes"][0]["id"], mark.json["note"]["id"])
+        self.assertFalse(self.post(self.second, "/leitor/novo").json["bookmarked"])
+
     def test_history_consent_isolation_and_revocation(self):
         self.draw(self.first, 1_700_000_000)
         self.assertEqual(self.rows("SELECT user_id FROM library_history"), [])

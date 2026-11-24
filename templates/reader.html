@@ -11,7 +11,23 @@
 </header>
 <section class="folio" aria-label="Versículo sorteado">
   <article class="passage">
-    <div class="edition"><span aria-hidden="true"></span> Bíblia Sagrada</div>
+    <div class="folio-heading">
+      <div class="edition"><span aria-hidden="true"></span> Bíblia Sagrada</div>
+      {% if draw_token %}
+      {# A fita abre a mesma coleção privada da Bíblia. Ao salvar, continuamos
+         na folha atual e o leitor escolhe quando quer ir ao índice. #}
+      <div class="folio-bookmark" data-draw-bookmark data-verse-id="{{ verse.id }}">
+        <form method="post" action="{{ url_for('bible_notes.quick') }}"{% if bookmarked %} hidden{% endif %}>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="book" value="{{ verse.book_code }}">
+          <input type="hidden" name="chapter" value="{{ verse.chapter }}">
+          <input type="hidden" name="start_verse" value="{{ verse.start_verse }}">
+          <button type="submit" title="Guardar esta passagem no índice da Bíblia">Marcar página</button>
+        </form>
+        <a href="{{ bookmark_index_url }}" title="Ver a página marcada no índice da Bíblia"{% if not bookmarked %} hidden{% endif %}>Ver no índice</a>
+      </div>
+      {% endif %}
+    </div>
     <div id="reading" aria-live="polite">
       <blockquote id="verse-text">{{ verse.text }}</blockquote>
       <p class="reference" id="verse-reference">{{ verse.reference }}</p>

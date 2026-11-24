@@ -68,6 +68,7 @@ def init_accounts(db):
             email TEXT NOT NULL,
             name TEXT NOT NULL,
             phone_e164 TEXT,
+            tutorial_seen INTEGER NOT NULL DEFAULT 0 CHECK(tutorial_seen IN (0,1)),
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             disabled INTEGER NOT NULL DEFAULT 0 CHECK(disabled IN (0, 1))
         );
@@ -101,6 +102,11 @@ def init_accounts(db):
         if "phone_e164" not in columns:
             # NULL identifica os cadastros anteriores à coleta de celular.
             db.execute("ALTER TABLE users ADD COLUMN phone_e164 TEXT")
+        if "tutorial_seen" not in columns:
+            # Quem já tinha cadastro conhece a plataforma. Somente os perfis
+            # novos começam com o guia de primeiros passos ainda disponível.
+            db.execute("ALTER TABLE users ADD COLUMN tutorial_seen INTEGER NOT NULL DEFAULT 0 CHECK(tutorial_seen IN (0,1))")
+            db.execute("UPDATE users SET tutorial_seen=1")
 
 
 @bp.record_once
@@ -144,11 +150,14 @@ def _renew_session():
     # deve reativar cookies opcionais nem fazer reaparecer o pedido de aceite.
     cookie_choice = session.get("cookie_choice")
     last_verse = session.get("last_verse")
+    saw_tutorial = session.get("tutorial_seen")
     session.clear()
     if cookie_choice in {"essential", "preferences"}:
         session["cookie_choice"] = cookie_choice
     if isinstance(last_verse, int):
         session["last_verse"] = last_verse
+    if saw_tutorial:
+        session["tutorial_seen"] = True
 
 
 def _is_owner(user):
@@ -188,7 +197,7 @@ def load_account():
         "accounts.login", "accounts.signup", "accounts.google_callback",
         "facebook_auth.login", "facebook_auth.signup", "facebook_auth.callback",
         "password_auth.login", "password_auth.signup", "password_auth.change_password",
-        "billing.portal", "information", "cookies",
+        "billing.portal", "information", "cookies", "tutorial.remember",
     }:
         destination = request.full_path.rstrip("?") if request.method == "GET" else "/conta"
         return redirect(url_for("accounts.phone", next=_safe_destination(destination)), code=303)

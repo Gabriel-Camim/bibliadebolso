@@ -101,7 +101,10 @@ def index():
     if view in {"1", "notas"}:
         return redirect(url_for("bible.chapter", book_code=book, chapter=chapter,
                                 indice=view, _anchor="indice-biblico"))
-    return redirect(url_for("bible.chapter", book_code=book, chapter=chapter))
+    # Só a entrada pela aba Bíblia exibe a encadernação fechada. Uma busca,
+    # um link salvo ou uma virada de folha abre diretamente na referência.
+    return redirect(url_for("bible.chapter", book_code=book, chapter=chapter,
+                            abrir=1 if not request.args else None))
 
 
 @bp.get("/versiculo/<int:verse_id>")
@@ -172,6 +175,15 @@ def chapter(book_code, chapter):
                                 (leaf.book, leaf.chapter, leaf.first, leaf.last)).fetchall()
             spread.append((leaf, verses))
 
+    # Em uma abertura que atravessa capítulos, a marca rápida acompanha a
+    # folha solicitada (no celular é a única visível). Um verso selecionado
+    # tem precedência. Lacunas editoriais não viram marca-páginas vazios.
+    current_verses = next(verses for leaf, verses in spread if leaf.number == current.number)
+    quick_target = selected if selected and selected["text"] else next(
+        (verse for verse in current_verses if verse["text"]), None)
+    open_cover = (request.args.get("abrir") == "1" and not request.headers.get("X-Bible-Chapter")
+                  and current.number == 1 and not selected and "indice" not in request.args)
+
     def page_link(index):
         return _leaf_url(leaves[index]) if 0 <= index < len(leaves) else None
 
@@ -186,6 +198,7 @@ def chapter(book_code, chapter):
     return render_template(template, books=corpus.BOOKS, by_book=by_book, book_code=book_code,
                            page_title=page_title + " · bibliadebolso.com",
                            chapter=chapter, numbers=numbers, current=current, spread=spread,
+                           open_cover=open_cover, quick_target=quick_target,
                            selected=selected, saved=saved, verse_url=_verse_url, total_pages=len(leaves),
                            previous_spread=page_link(left - 2), next_spread=page_link(left + 2),
                            previous_leaf=page_link(current.number - 2), next_leaf=page_link(current.number),
