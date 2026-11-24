@@ -45,7 +45,7 @@ class FacebookAccess(TestCase):
         # token CSRF, assim como as páginas reais de cadastro e de entrada.
         with self.client.session_transaction() as session:
             csrf = session.setdefault("_csrf", "token-de-formulario")
-        fields = {"accept_policies":"yes", "next":"/biblia", "csrf_token":csrf, **changes}
+        fields = {"accept_policies":"yes", "next":"/biblia", "phone":"(11) 98765-4321", "csrf_token":csrf, **changes}
         return self.client.post("/auth/facebook/" + path, data=fields)
 
     def finish(self, start, **changes):
@@ -58,6 +58,7 @@ class FacebookAccess(TestCase):
         # Facebook. O cadastro somente é concluído após o aceite explícito.
         self.assertTrue(self.finish(self.start("entrar")).location.startswith("/cadastro"))
         self.assertTrue(self.start(accept_policies="").location.startswith("/cadastro"))
+        self.assertTrue(self.start(phone="").location.startswith("/cadastro"))
         with self.client.session_transaction() as session:
             session.update(cookie_choice="essential", last_verse=7)
         start = self.start()
@@ -67,6 +68,7 @@ class FacebookAccess(TestCase):
         self.assertEqual(query["redirect_uri"], ["https://leitor.example.test/auth/facebook/callback"])
         self.assertEqual(query["scope"], ["public_profile,email"])
         self.assertNotIn("client_secret", query)
+        self.assertNotIn("98765", start.location)
         self.assertEqual(self.finish(start).location, "/biblia")
         with self.client.session_transaction() as session:
             user_id = session["user_id"]
@@ -76,6 +78,7 @@ class FacebookAccess(TestCase):
             self.assertNotIn("token-de-ensaio", str(dict(session)))
         user = self.db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         self.assertEqual((user["auth_provider"], user["email"]), ("facebook", "nome@example.test"))
+        self.assertEqual(user["phone_e164"], "+5511987654321")
         self.assertEqual(self.client.get("/admin").status_code, 403)
         self.assertEqual(self.db.execute("SELECT created FROM account_totals").fetchone()[0], 2)
         # O titular Facebook continua sendo identificado pelo mesmo subject

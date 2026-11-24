@@ -7,10 +7,6 @@
   display: flex; align-items: center;
 }
 .scripture-toolbar { justify-content: space-between; align-items: flex-end; margin: 0 0 1.4rem; gap: 1rem; }
-.scripture-titles p {
-  margin: 0 0 .35rem; font: 650 .67rem/1.45 var(--sans); color: #786342;
-  text-transform: uppercase; letter-spacing: .19em;
-}
 .scripture-titles h1 { margin: 0; font: 500 clamp(2.65rem,5vw,4.6rem)/1 var(--serif); letter-spacing: -.064em; color: #302b23; }
 .scripture-tools { gap: .55rem; }
 .scripture-tools details { position: relative; z-index: 5; }
@@ -150,7 +146,6 @@
   .scripture-tools { gap:.35rem; }
   .scripture-tools summary { padding:.4rem .66rem; }
   .scripture-titles h1 { font-size:clamp(2rem,8vw,3.3rem); }
-  .scripture-titles p { font-size:.58rem; letter-spacing:.12em; }
   .scripture-desk { padding:.75rem .7rem .35rem; border-radius:9px; }
   .volume-legend { margin:0 .15rem .62rem; }
   .volume-cover { padding:2px 4px 8px; }

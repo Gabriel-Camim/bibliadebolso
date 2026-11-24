@@ -12,6 +12,9 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, ses
 from werkzeug.exceptions import HTTPException
 
 ROOT = Path(__file__).resolve().parent
+# Incremente ao acrescentar uma migração em qualquer init_* abaixo. A versão
+# só é registrada após todas as tabelas, colunas e índices ficarem prontos.
+SCHEMA_VERSION = 2
 # Em produção, as variáveis fornecidas pela hospedagem têm prioridade sobre o .env.
 load_dotenv(ROOT / ".env")
 
@@ -74,6 +77,34 @@ def public_origin(configured, on_render):
     return chosen or local
 
 
+def initialize_database(backend):
+    """Reaproveita o esquema instalado quando o serviço gratuito volta a acordar."""
+    db = core.get_db()
+    if backend == "sqlite":
+        db.execute("PRAGMA journal_mode=WAL")
+    # Olhar o catálogo também funciona na primeira instalação. Um banco que
+    # já foi atualizado requer só duas leituras, sem repetir as migrações
+    # de cada módulo pela rede a cada reinício.
+    has_versions = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='site_schema_versions'"
+    ).fetchone()
+    if has_versions and db.execute("SELECT 1 FROM site_schema_versions WHERE version=?", (SCHEMA_VERSION,)).fetchone():
+        return
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS site_schema_versions(version INTEGER PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS daily_metrics(
+            day TEXT PRIMARY KEY, visits INTEGER NOT NULL, verses INTEGER NOT NULL);
+    """)
+    accounts.init_accounts(db)
+    password_auth.init_password_auth(db)
+    bible_notes.init_notes(db)
+    library.init_library(db)
+    billing.init_billing(db)
+    study.init_study(db)
+    with db:
+        db.execute("INSERT OR IGNORE INTO site_schema_versions(version) VALUES(?)", (SCHEMA_VERSION,))
+
+
 def create_app(config=None):
     """Monta os módulos e permite usar um banco temporário durante os testes."""
     app = Flask(__name__)
@@ -130,18 +161,16 @@ def create_app(config=None):
         app.register_blueprint(blueprint)
 
     with app.app_context():
-        db = core.get_db()
-        if app.config["DATABASE_BACKEND"] == "sqlite":
-            db.execute("PRAGMA journal_mode=WAL")  # No Turso, a hospedagem gerencia o journal.
-        db.execute("""CREATE TABLE IF NOT EXISTS daily_metrics(
-            day TEXT PRIMARY KEY, visits INTEGER NOT NULL, verses INTEGER NOT NULL)""")
-        accounts.init_accounts(db)
-        password_auth.init_password_auth(db)
-        bible_notes.init_notes(db)
-        library.init_library(db)
-        billing.init_billing(db)
-        study.init_study(db)
-        db.commit()
+        initialize_database(backend)
+
+    # O navegador reaproveita os arquivos públicos entre telas. A versão no
+    # endereço muda a cada deploy para CSS e JS novos chegarem imediatamente.
+    asset_version = os.getenv("RENDER_GIT_COMMIT", "")[:12]
+
+    @app.url_defaults
+    def version_static_assets(endpoint, values):
+        if asset_version and endpoint == "static":
+            values.setdefault("v", asset_version)
 
     def draw_verse(opened):
         """Emite o recibo do sorteio junto com o texto que o leitor vai ver."""
@@ -208,6 +237,11 @@ def create_app(config=None):
         # guardar uma cópia em cache das páginas privadas.
         if request.endpoint != "static":
             response.headers["Cache-Control"] = "no-store"
+        elif response.status_code in (200, 304) and asset_version:
+            if request.args.get("v") == asset_version:
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            elif request.path.endswith((".png", ".jpg", ".ttf", ".woff2")):
+                response.headers["Cache-Control"] = "public, max-age=86400"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["X-Frame-Options"] = "DENY"

@@ -39,7 +39,7 @@
                      title="Selecionar {{ books[leaf.book] }} {{ leaf.chapter }}:{{ verse.verse }}" {% if active %}aria-current="location"{% endif %}><sup>{{ verse.verse }}</sup>{% if verse.text %}{% if leaf.local == 1 and loop.first %}<span class="initial-cap">{{ verse.text[:1] }}</span>{{ verse.text[1:] }}{% else %}{{ verse.text }}{% endif %}{% else %}<em>Sem texto nesta edição.</em>{% endif %}</a>
                   {% if active and verse.text %}
                     <div class="verse-tools">
-                      <a class="verse-study" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ icon('feather',14) }} Estudar com a IA</a>
+                      <a class="verse-study ai-attention" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ icon('spark',14) }} Estudar com a IA</a>
                       {% if g.user and not g.user.disabled %}
                         <button type="button" data-note-create>{{ icon('feather',14) }} Anotar</button>
                         <form method="post" action="{{ url_for('library.favorite_verse', verse_id=verse.id) }}" data-favorite-form data-verse-id="{{ verse.id }}">

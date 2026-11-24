@@ -106,6 +106,17 @@ class ReaderFlow(TestCase):
             self.assertEqual(reply.json, {"choice":choice})
         self.assertEqual(self.client.get("/privacidade").status_code, 200)
 
+    def test_published_assets_can_be_cached_while_readings_remain_fresh(self):
+        with patch.dict(os.environ, {"RENDER_GIT_COMMIT": "aa1234567890123456789"}):
+            app = create_app(dict(TESTING=True, DATABASE=self.database, SECRET_KEY="teste"))
+        client = app.test_client()
+        page = client.get("/")
+        self.assertIn("site.css?v=aa1234567890", page.get_data(as_text=True))
+        self.assertEqual(page.headers["Cache-Control"], "no-store")
+        with client.get("/static/site.css?v=aa1234567890") as css:
+            self.assertIn("immutable", css.headers["Cache-Control"])
+            self.assertNotIn("Set-Cookie", css.headers)
+
     def test_public_draw_has_navigation_but_no_favorite(self):
         """A página pública e o botão de novo sorteio obedecem à mesma regra."""
         self.assertEqual(self.client.head("/").status_code, 200)

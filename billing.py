@@ -22,7 +22,7 @@ import os
 import re
 import time
 import uuid
-from datetime import datetime
+from datetime import date, datetime, time as wall_time, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
@@ -96,6 +96,14 @@ def init_billing(db):
             amount INTEGER
         );
         CREATE INDEX IF NOT EXISTS billing_event_time ON billing_events(created);
+        -- Um acesso concedido pelo dono é independente da assinatura e da
+        -- receita. A chave composta isola as concessões de teste das reais.
+        CREATE TABLE IF NOT EXISTS study_manual_licenses (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            livemode INTEGER NOT NULL CHECK(livemode IN (0,1)),
+            expires_at INTEGER,
+            PRIMARY KEY(user_id,livemode)
+        );
     """)
 
 
@@ -135,22 +143,99 @@ def billing_time(stamp):
     return datetime.fromtimestamp(stamp, zone).strftime("%d/%m/%Y %H:%M %Z")
 
 
-def has_subscription(db, user_id):
-    """O acesso depende de um período pago, confirmado pelo servidor.
+def _paid_period(user_column):
+    """Compartilha a regra financeira entre painel, estudo e cobrança.
 
-    Uma fatura de outro mês não estende o acesso. Se o período corrente foi
-    totalmente estornado ou contestado, o valor disponível volta a zero.
+    O chamador fornece somente uma expressão SQL fixa do código. Todo dado
+    de formulário permanece nos parâmetros. Estorno total, contestação ou
+    período encerrado deixam de conferir o benefício.
     """
-    if not user_id:
-        return False
-    return bool(db.execute("""
+    return f"""EXISTS (
         SELECT 1 FROM billing_orders o JOIN billing_invoices i ON i.order_id=o.id
-        WHERE o.user_id=? AND o.livemode=? AND coalesce(o.sub_status, '') NOT IN
+        WHERE o.user_id={user_column} AND o.livemode=? AND coalesce(o.sub_status, '') NOT IN
           ('canceled','unpaid','incomplete_expired','paused') AND i.period_end>?
           AND i.amount + coalesce((SELECT sum(a.amount) FROM billing_adjustments a
                                   WHERE a.invoice=i.invoice),0)>0
-        LIMIT 1
-    """, (user_id, _live_mode(), int(time.time()))).fetchone())
+    )"""
+
+
+def has_subscription(db, user_id):
+    """Verdadeiro somente quando existe um período pago confirmado na Stripe."""
+    if not user_id:
+        return False
+    return bool(db.execute("SELECT " + _paid_period("?"),
+                           (user_id, _live_mode(), int(time.time()))).fetchone()[0])
+
+
+def has_study_license(db, user_id):
+    """O chat reconhece licença manual vigente ou assinatura paga da mesma modalidade."""
+    if not user_id:
+        return False
+    mode, now = _live_mode(), int(time.time())
+    sql = """SELECT EXISTS(SELECT 1 FROM study_manual_licenses
+             WHERE user_id=? AND livemode=? AND (expires_at IS NULL OR expires_at>?)) OR """
+    return bool(db.execute(sql + _paid_period("?"), (user_id, mode, now, user_id, mode, now)).fetchone()[0])
+
+
+def admin_license_status(db, users):
+    """Carrega os estados da página de contas em uma única viagem ao banco."""
+    ids = [user["id"] for user in users]
+    if not ids:
+        return {}
+    mode, now = _live_mode(), int(time.time())
+    places = ",".join("?" for _ in ids)
+    sql = f"""SELECT u.id, {_paid_period("u.id")} AS paid, m.user_id AS manual, m.expires_at
+              FROM users u LEFT JOIN study_manual_licenses m ON m.user_id=u.id AND m.livemode=?
+              WHERE u.id IN ({places})"""
+    result = {}
+    for row in db.execute(sql, (mode, now, mode, *ids)):
+        end = row["expires_at"]
+        # O campo da tela representa o último dia válido no fuso de São Paulo.
+        # O banco guarda a primeira meia-noite *após* esse dia, em Unix time.
+        last = (datetime.fromtimestamp(end - 1, ZoneInfo("America/Sao_Paulo")).date() if end else None)
+        result[row["id"]] = dict(paid=bool(row["paid"]), manual=row["manual"] is not None,
+                                 expired=end is not None and end <= now, last_day=last,
+                                 mode="live" if mode else "test")
+    return result
+
+
+@bp.post("/admin/contas/<int:user_id>/licenca")
+@admin_required
+def manual_license(user_id):
+    """Somente o dono pode conceder, renovar ou revogar o acesso manual desta conta."""
+    db = get_db()
+    mode = _live_mode()
+    if request.form.get("offer_mode") != ("live" if mode else "test"):
+        abort(409, description="O ambiente de cobrança mudou. Atualize o painel.")
+    action = request.form.get("action")
+    until = request.form.get("until", "").strip()
+    expires = None
+    if action not in {"conceder", "revogar"}:
+        abort(400)
+    if action == "conceder" and until:
+        try:
+            last_day = date.fromisoformat(until)
+            expires = int(datetime.combine(last_day + timedelta(days=1), wall_time.min,
+                                           ZoneInfo("America/Sao_Paulo")).timestamp())
+        except (ValueError, OverflowError, OSError):
+            abort(400, description="Informe uma data de validade correta.")
+        if expires <= time.time():
+            abort(400, description="A data de validade precisa ser hoje ou posterior.")
+    with db:
+        # Conferimos o usuário dentro da transação. Uma exclusão concorrente
+        # não pode deixar uma licença órfã, e salvar de novo é idempotente.
+        db.execute("BEGIN IMMEDIATE")
+        if not db.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone():
+            abort(404)
+        if action == "revogar":
+            db.execute("DELETE FROM study_manual_licenses WHERE user_id=? AND livemode=?", (user_id, mode))
+        else:
+            db.execute("""INSERT INTO study_manual_licenses(user_id,livemode,expires_at) VALUES(?,?,?)
+                          ON CONFLICT(user_id,livemode) DO UPDATE SET expires_at=excluded.expires_at""",
+                       (user_id, mode, expires))
+    flash("Licença manual revogada." if action == "revogar" else "Licença manual salva.")
+    return redirect(url_for("accounts.admin_home", q=request.form.get("q", "")[:200],
+                            page=request.form.get("page", 1, type=int)), code=303)
 
 
 def _manageable_order(db, user_id):

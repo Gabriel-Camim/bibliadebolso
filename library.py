@@ -13,7 +13,7 @@ from flask import Blueprint, abort, current_app, flash, jsonify, redirect, rende
 from itsdangerous import BadData, URLSafeTimedSerializer
 
 from accounts import current_user, login_required
-from core import csrf_token, get_db
+from core import csrf_token, get_db, write_one
 from corpus import verse_by_id
 
 
@@ -54,22 +54,17 @@ def _record(verse_id, kind, when):
     user = current_user()
     if user is None or user["disabled"]:
         return
-    db = get_db()
-    with db:
-        # Esta consulta e a inserção precisam enxergar a mesma autorização.
-        # A transação também impede duas abas de duplicarem uma abertura seguida.
-        db.execute("BEGIN IMMEDIATE")
-        if not db.execute("SELECT 1 FROM library_history_consent WHERE user_id=?", (user["id"],)).fetchone():
-            return
-        if kind == "browse":
-            previous = db.execute("""
-                SELECT verse_id,kind FROM library_history WHERE user_id=?
-                ORDER BY occurred_at DESC,id DESC LIMIT 1
-            """, (user["id"],)).fetchone()
-            if previous and previous["kind"] == kind and previous["verse_id"] == verse_id:
-                return
-        db.execute("INSERT INTO library_history(user_id,verse_id,kind,occurred_at) VALUES(?,?,?,?)",
-                   (user["id"], verse_id, kind, when))
+    # Uma única instrução confere o aceite e registra a leitura. A cláusula
+    # adicional evita aberturas seguidas da mesma passagem, inclusive entre abas.
+    sql = """INSERT INTO library_history(user_id,verse_id,kind,occurred_at)
+             SELECT user_id, ?, ?, ? FROM library_history_consent WHERE user_id=?"""
+    args = (verse_id, kind, when, user["id"])
+    if kind == "browse":
+        sql += """ AND NOT coalesce((SELECT kind='browse' AND verse_id=?
+                    FROM library_history WHERE user_id=?
+                    ORDER BY occurred_at DESC,id DESC LIMIT 1), 0)"""
+        args += (verse_id, user["id"])
+    write_one(sql, args)
 
 
 def _signer():

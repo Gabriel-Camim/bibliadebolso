@@ -85,6 +85,45 @@ class BillingWebhookTest(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) FROM billing_orders WHERE session_id IS NOT NULL").fetchone()[0], 1)
         self.assertFalse(billing.has_subscription(self.db, 1))
 
+    def test_manual_grant_renew_revoke_and_stripe_period_are_independent(self):
+        # O mesmo formulário atende o dono no painel real. Na suíte de cobrança
+        # basta registrar o destino do redirect, sem trocar a sessão Google.
+        app = self.client.application
+        app.add_url_rule("/admin", endpoint="accounts.admin_home", view_func=lambda: "")
+        route = "/admin/contas/1/licenca"
+        grant = {"action":"conceder", "offer_mode":"test"}
+        self.assertEqual(self.client.post(route, data=grant).status_code, 303)
+        with app.app_context():
+            self.assertTrue(billing.has_study_license(self.db, 1))
+            self.assertFalse(billing.has_subscription(self.db, 1))
+            self.assertEqual(billing.billing_metrics(self.db)["paid_count"], 0)
+            self.assertIsNone(billing.admin_license_status(self.db, [{"id":1}])[1]["last_day"])
+        self.assertEqual(self.client.post(route, data={**grant, "until":"2090-03-12"}).status_code, 303)
+        self.assertEqual(self.client.post(route, data={**grant, "until":"2000-01-02"}).status_code, 400)
+        self.assertEqual(self.client.post("/admin/contas/99/licenca", data=grant).status_code, 404)
+        with app.app_context():
+            self.assertEqual(billing.admin_license_status(self.db, [{"id":1}])[1]["last_day"].isoformat(), "2090-03-12")
+        # Se a instalação mudar de teste para produção, a licença de teste não
+        # concede o acesso e uma aba antiga também não altera licenças reais.
+        with patch.dict(app.config, STRIPE_SECRET_KEY="sk_live_exemplo"):
+            with app.app_context():
+                self.assertFalse(billing.has_study_license(self.db, 1))
+            self.assertEqual(self.client.post(route, data=grant).status_code, 409)
+        with self.db:
+            self.db.execute("UPDATE study_manual_licenses SET expires_at=?", (int(time.time())-1,))
+        with app.app_context():
+            self.assertFalse(billing.has_study_license(self.db, 1))
+            self.assertTrue(billing.admin_license_status(self.db, [{"id":1}])[1]["expired"])
+        with self.db:
+            self.db.execute("INSERT INTO billing_invoices VALUES('in_pago','pedido',NULL,2990,9999999999)")
+        self.assertEqual(self.client.post(route, data={"action":"revogar","offer_mode":"test"}).status_code, 303)
+        with app.app_context():
+            self.assertTrue(billing.has_study_license(self.db, 1))
+            self.assertTrue(billing.admin_license_status(self.db, [{"id":1}])[1]["paid"])
+            self.assertFalse(billing.admin_license_status(self.db, [{"id":1}])[1]["manual"])
+        with patch.dict(app.config, OWNER_GOOGLE_SUB="outro-proprietario"):
+            self.assertEqual(self.client.post(route, data=grant).status_code, 403)
+
     def test_draft_to_study_with_modern_invoice_snapshot(self):
         # Todos os dados deste percurso estão no SQLite em memória. A oferta
         # de R$ 29,90 existe somente no ambiente de teste desta suíte.

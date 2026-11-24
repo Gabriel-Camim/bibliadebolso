@@ -4,5 +4,7 @@ Authlib>=1.6.10,<2
 requests>=2.32,<3
 python-dotenv>=1.2,<2
 waitress>=3.0,<4
+# Metadados de numeração para validar celulares brasileiros e internacionais.
+phonenumberslite>=9,<10
 # No Windows, fornece ao zoneinfo as regras do fuso do painel financeiro.
 tzdata>=2025.2

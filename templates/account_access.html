@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "account_phone_field.html" import phone_field %}
 {% block title %}{{ 'Criar conta' if signup else 'Entrar' }} · bibliadebolso.com{% endblock %}
 {% macro hidden_fields() -%}
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -21,7 +22,7 @@
       {% set provider = 'Google' if selected == 'google' else 'Facebook' %}
       <p>Crie seu perfil da Bíblia de Bolso com sua conta {{ provider }}.</p>
       <form class="account-form" method="post" action="{{ url_for('accounts.signup' if selected == 'google' else 'facebook_auth.signup') }}">
-        {{ hidden_fields() }}{{ policies() }}
+        {{ hidden_fields() }}{{ phone_field() }}{{ policies() }}
         <button class="button primary" {% if not (google_ready if selected=='google' else facebook_ready) %}disabled{% endif %}>Continuar com {{ provider }}</button>
       </form>
       <a href="{{ url_for('accounts.signup',next=next_url) }}">Escolher outra forma de cadastro</a>
@@ -33,6 +34,7 @@
           <label>Nome de usuário<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" required aria-describedby="username-hint"></label>
           <small id="username-hint">De 3 a 32 caracteres. Use letras sem acento, números, ponto, hífen ou sublinhado.</small>
           <label>E-mail<input type="email" name="email" autocomplete="email" maxlength="254" required></label>
+          {{ phone_field() }}
         {% else %}
           <label>Nome de usuário ou e-mail<input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
         {% endif %}

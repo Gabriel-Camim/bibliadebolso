@@ -4,12 +4,20 @@ O servidor mantém a conexão SQL de uma transação e devolve um identificador
 rotativo (baton) a cada resposta. Nunca reconstruímos a transação no cliente.
 Referência: github.com/tursodatabase/libsql/blob/main/docs/HRANA_3_SPEC.md
 """
+import atexit
 import base64
 import re
 import sqlite3
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
+from requests.adapters import HTTPAdapter
+
+# As requisições Flask têm transações, cookies e credenciais separados. O que
+# podemos reaproveitar entre elas é o transporte TLS até o mesmo servidor:
+# não é necessário renegociar uma conexão internacional a cada página/consulta.
+_https_pool = HTTPAdapter(pool_connections=8, pool_maxsize=12, max_retries=0)
+atexit.register(_https_pool.close)
 
 
 def _base_url(value, original=None):
@@ -152,6 +160,7 @@ class Connection:
         self._timeout = timeout
         self.row_factory = sqlite3.Row
         self._http = requests.Session()
+        self._http.mount("https://", _https_pool)
         self._http.headers.update({"Authorization": "Bearer " + token})
 
     @property
@@ -162,6 +171,9 @@ class Connection:
         self._closed = True
         self._transaction = False
         self._baton = None
+        # Session.close() fecha seus adaptadores. O pool compartilhado vive
+        # até a saída do processo, mas nenhum cabeçalho ou baton fica nele.
+        self._http.adapters.pop("https://", None)
         self._http.close()
 
     def _send(self, operations, *, close=False):
@@ -271,6 +283,19 @@ class Connection:
         for params in parameter_sets:
             result.rowcount += self.execute(sql, params).rowcount
         return result
+
+    def execute_atomic(self, sql, parameters):
+        """Grava uma única instrução em autocommit, depois de verificar as FKs.
+
+        Contadores e histórico usam INSERTs condicionais que o SQLite já
+        executa de forma atômica. Dispensamos viagens para BEGIN e COMMIT.
+        Dentro de uma transação maior preservamos a decisão do chamador.
+        """
+        if self.in_transaction:
+            return self.execute(sql, parameters)
+        self._open_checked()
+        reply = self._send([_execute(sql, parameters)], close=True)[0]
+        return Cursor(reply["result"], self.row_factory, write=True)
 
     def executescript(self, sql):
         """Instala as sequências DDL da aplicação com o parser do próprio libSQL."""

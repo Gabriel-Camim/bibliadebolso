@@ -170,6 +170,20 @@ class TursoTransactions(TestCase):
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM nota").fetchone()[0], 0)
         self.assertTrue(all(url == "https://leitor.turso.io/v3/pipeline" for url, _, _ in self.transport.posts))
 
+    def test_single_write_confirms_foreign_keys_and_obeys_outer_rollback(self):
+        self.conn.executescript("""CREATE TABLE perfil(id INTEGER PRIMARY KEY);
+            CREATE TABLE leitura(dono INTEGER REFERENCES perfil(id)); INSERT INTO perfil VALUES(1);""")
+        before = self.post.call_count
+        self.conn.execute_atomic("INSERT INTO leitura VALUES(?)", (1,))
+        self.assertEqual(self.post.call_count - before, 2)
+        self.assertFalse(self.transport.streams)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.conn.execute_atomic("INSERT INTO leitura VALUES(?)", (2,))
+        self.conn.execute("BEGIN IMMEDIATE")
+        self.conn.execute_atomic("INSERT INTO leitura VALUES(?)", (1,))
+        self.conn.rollback()
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM leitura").fetchone()[0], 1)
+
     def test_lost_commit_is_never_resent(self):
         self.conn.execute("CREATE TABLE marcador(nome TEXT)")
         self.conn.execute("BEGIN IMMEDIATE")
@@ -212,14 +226,17 @@ class TursoTransactions(TestCase):
             return client.post(url, data={**fields, "csrf_token":csrf})
 
         created = submit(first, "/auth/senha/cadastro", username="leitor", email="leitor@example.test",
-                         password="uma-senha-de-teste", accept_policies="yes")
+                         password="uma-senha-de-teste", phone="(11) 98765-4321", accept_policies="yes")
         self.assertEqual(created.status_code, 303)
         saved = submit(first, "/biblia/marcacoes", book="GEN", chapter=1, start_verse=1,
                        end_verse=1, color="gold", title="Minha leitura", body="Voltar aqui.")
         self.assertEqual(saved.status_code, 201)
         # Outra instância, sem os cookies da anterior, abre o mesmo banco.
         # Ela só enxerga a nota depois de verificar a senha e criar nova sessão.
+        before = self.post.call_count
         restarted = create_app(config).test_client()
+        # Ao acordar, a Render precisa consultar apenas a versão do esquema.
+        self.assertLessEqual(self.post.call_count - before, 2)
         self.assertEqual(restarted.get("/biblia/marcacoes").status_code, 401)
         entered = submit(restarted, "/auth/senha/entrar", login="leitor", password="uma-senha-de-teste")
         self.assertEqual(entered.status_code, 303)

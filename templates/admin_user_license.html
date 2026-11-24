@@ -1,0 +1,21 @@
+{% set license = licenses[person.id] %}
+{% if license.paid %}<strong>Assinatura Stripe ativa</strong><br>{% endif %}
+<details>
+  <summary>
+    {% if license.manual %}Licença manual {{ 'vencida' if license.expired else 'ativa' }}
+    {% elif license.paid %}Gerenciar licença manual
+    {% else %}Conceder licença manual{% endif %}
+  </summary>
+  <form method="post" action="{{ url_for('billing.manual_license', user_id=person.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="q" value="{{ search }}">
+    <input type="hidden" name="page" value="{{ page }}">
+    <input type="hidden" name="offer_mode" value="{{ license.mode }}">
+    <p>{{ 'Ambiente de teste' if license.mode == 'test' else 'Ambiente de produção' }} · Acesso de estudo concedido pelo administrador.</p>
+    <label for="license-until-{{ person.id }}">Válida até (opcional)</label>
+    <input id="license-until-{{ person.id }}" type="date" name="until" value="{{ license.last_day.isoformat() if license.last_day else '' }}">
+    <small>Deixe em branco para conceder por tempo indeterminado.</small>
+    <button class="button secondary" name="action" value="conceder">{{ 'Atualizar licença' if license.manual else 'Conceder licença' }}</button>
+    {% if license.manual %}<button class="button secondary" name="action" value="revogar" formnovalidate>Revogar licença manual</button>{% endif %}
+  </form>
+</details>

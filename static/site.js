@@ -151,6 +151,11 @@ if (draw) {
         favoriteReceipt.form.hidden = !verse.draw_token;
       }
       const reading = document.querySelector("#reading");
+      // O sorteio reaproveita o mesmo botão. Reiniciamos o halo quando a
+      // referência muda. Na Bíblia o botão já nasce novo a cada seleção.
+      studyLink.classList.remove("ai-attention");
+      void studyLink.offsetWidth;
+      studyLink.classList.add("ai-attention");
       reading.classList.remove("reading-new");
       requestAnimationFrame(() => reading.classList.add("reading-new"));
       jesus.src = "/static/personagens/jesus-ensina.png";

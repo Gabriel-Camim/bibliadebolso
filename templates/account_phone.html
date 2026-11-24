@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "account_phone_field.html" import phone_field %}
+{% block title %}{{ 'Concluir cadastro' if completing else 'Atualizar celular' }} · bibliadebolso.com{% endblock %}
+{% block content %}
+<section class="account-wrap">
+  <div class="panel account-card">
+    <h1>{{ 'Conclua seu cadastro' if completing else 'Atualize seu celular' }}</h1>
+    {% if completing %}<p>Informe seu celular para continuar com o perfil de {{ user.name }}.</p>{% endif %}
+    <form class="account-form" method="post" action="{{ url_for('accounts.phone') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      {{ phone_field(request.form.get('phone', user.phone_e164)) }}
+      {% if completing %}
+      <label class="account-check"><input type="checkbox" name="accept_policies" value="yes" required>
+        <span>Li e aceito os <a href="/termos" target="_blank" rel="noopener">termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">política de privacidade</a>.</span></label>
+      {% endif %}
+      <button class="button primary">{{ 'Salvar e continuar' if completing else 'Salvar celular' }}</button>
+    </form>
+    <a href="{{ url_for('accounts.profile') }}">Minha conta</a>
+  </div>
+</section>
+{% endblock %}

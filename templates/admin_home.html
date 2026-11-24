@@ -29,11 +29,13 @@
     {% if users %}
     <div class="account-scroll">
       <table>
-        <thead><tr><th>Pessoa</th><th>Cadastro (UTC)</th><th>Acesso</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Pessoa</th><th>Celular</th><th>Cadastro (UTC)</th><th>Licença de estudo</th><th>Acesso</th><th>Ação</th></tr></thead>
         <tbody>{% for person in users %}
           <tr>
             <td><strong>{{ person.name }}</strong><br>{{ person.email }}</td>
+            <td>{{ person.phone_e164 or 'Pendente' }}</td>
             <td>{{ person.created_at[:10] }}</td>
+            <td>{% include 'admin_user_license.html' %}</td>
             <td>{{ 'Suspenso' if person.disabled else 'Ativo' }}</td>
             <td>{% if person.id != g.user.id %}
               <form method="post" action="{{ url_for('accounts.set_access', user_id=person.id) }}">

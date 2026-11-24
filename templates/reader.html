@@ -11,13 +11,13 @@
 </header>
 <section class="folio" aria-label="Versículo sorteado">
   <article class="passage">
-    <div class="edition"><span aria-hidden="true"></span> BÍBLIA PORTUGUESA MUNDIAL</div>
+    <div class="edition"><span aria-hidden="true"></span> Bíblia Sagrada</div>
     <div id="reading" aria-live="polite">
       <blockquote id="verse-text">{{ verse.text }}</blockquote>
       <p class="reference" id="verse-reference">{{ verse.reference }}</p>
     </div>
     <div class="reader-actions">
-      <a class="button primary" id="study-link" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ icon('spark',17) }} Estudar com a IA</a>
+      <a class="button primary ai-attention" id="study-link" href="{{ url_for('study.start', verse_id=verse.id) }}">{{ icon('spark',17) }} Estudar com a IA</a>
       <button class="button secondary" id="draw" type="button" data-token="{{ csrf_token() }}">{{ icon('refresh',16) }} Novo versículo</button>
     </div>
     <div class="passage-links">
@@ -48,7 +48,4 @@
     <div class="print-frame" aria-hidden="true"></div>
   </figure>
 </section>
-<div class="folio-note">
-  <a href="https://ebible.org/details.php?id=porbrbsl" rel="external">{{ icon('feather',16) }} Sobre a tradução BPM</a>
-</div>
 {% endblock %}

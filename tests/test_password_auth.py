@@ -23,6 +23,7 @@ class PasswordAccess(TestCase):
         self.client = self.app.test_client()
         self.password = "uma frase longa com 🌿"
         self.data = dict(username="leitor.local", email="Leitor+Site@Example.test",
+                         phone="(11) 98765-4321",
                          password=self.password, accept_policies="yes", next="/biblioteca")
 
     def post(self, endpoint, values=None, client=None):
@@ -51,6 +52,7 @@ class PasswordAccess(TestCase):
             user = db.execute("SELECT * FROM users").fetchone()
             credential = db.execute("SELECT * FROM password_credentials").fetchone()
             self.assertEqual(user["auth_provider"], "password")
+            self.assertEqual(user["phone_e164"], "+5511987654321")
             self.assertEqual(user["id"], credential["user_id"])
             self.assertEqual(credential["email_key"], "leitor+site@example.test")
             self.assertTrue(check_password_hash(credential["password_hash"], self.password))
@@ -72,7 +74,8 @@ class PasswordAccess(TestCase):
         # Recusar um cadastro inválido ou repetido não cria registros pessoais
         # nem altera o contador histórico. Dois aliases locais são exclusivos.
         self.assertEqual(self.client.post("/auth/senha/cadastro", data=self.data).status_code, 400)
-        for changes in (dict(accept_policies=""), dict(username="a"), dict(email="inválido"), dict(password="curta")):
+        for changes in (dict(accept_policies=""), dict(username="a"), dict(email="inválido"), dict(password="curta"),
+                        dict(phone=""), dict(phone="11 3333-4444"), dict(phone="banana")):
             self.assertEqual(urlsplit(self.signup(**changes).location).path, "/cadastro")
         self.signup()
         self.post("/sair")
@@ -100,6 +103,60 @@ class PasswordAccess(TestCase):
         with self.client.session_transaction() as s:
             self.assertEqual(s["user_id"], rows[1]["id"])
         self.assertEqual(self.client.get("/admin").status_code, 403)
+
+    def test_old_account_keeps_its_library_destination_and_can_correct_phone(self):
+        self.signup()
+        destination = "/biblioteca?aba=historico"
+        with self.app.app_context():
+            db = get_db()
+            with db:
+                db.execute("UPDATE users SET phone_e164=NULL")
+                db.execute("DELETE FROM account_consents")
+        # Inclusive o cookie emitido antes da migração passa pela tela de
+        # conclusão, sem perder os parâmetros da página que tentou abrir.
+        before = urlsplit(self.client.get(destination).location)
+        self.assertEqual(before.path, "/conta/celular")
+        self.assertEqual(parse_qs(before.query)["next"], [destination])
+        self.assertEqual(self.client.get("/privacidade").status_code, 200)
+        self.post("/sair")
+        via_login = self.login(next=destination)
+        self.assertEqual(via_login.location, before.geturl())
+        self.assertIn('type="tel"', self.client.get(via_login.location).get_data(as_text=True))
+        form = dict(next=destination, phone="+1 202 555 0123")
+        self.assertEqual(self.post("/conta/celular", form).status_code, 400)
+        self.assertEqual(self.post("/conta/celular", {**form, "phone":"444", "accept_policies":"yes"}).status_code, 400)
+        with self.app.app_context():
+            self.assertIsNone(get_db().execute("SELECT phone_e164 FROM users").fetchone()[0])
+        self.assertEqual(self.post("/conta/celular", {**form, "accept_policies":"yes"}).location, destination)
+        self.assertEqual(self.client.get(destination).status_code, 200)
+        self.assertIn("+12025550123", self.client.get("/conta").get_data(as_text=True))
+        corrected = self.post("/conta/celular", dict(phone=self.data["phone"], next="//fora.invalid"))
+        self.assertEqual(corrected.location, "/conta")
+        self.assertIn("+5511987654321", self.client.get("/conta").get_data(as_text=True))
+
+    def test_only_owner_sees_contact_details_of_other_profiles(self):
+        self.signup()
+        owner_client = self.app.test_client()
+        with self.app.app_context():
+            db = get_db()
+            with db:
+                owner_id = db.execute("""INSERT INTO users(google_sub,email,name,phone_e164)
+                    VALUES('subject-google-dono','dono@example.test','Responsável','+12025550123')""").lastrowid
+        with owner_client.session_transaction() as cookie:
+            cookie["user_id"] = owner_id
+        admin = owner_client.get("/admin")
+        self.assertEqual(admin.status_code, 200)
+        for detail in ("leitor.local", self.data["email"], "+5511987654321", "Licença de estudo"):
+            self.assertIn(detail, admin.get_data(as_text=True))
+        self.assertEqual(self.client.get("/admin").status_code, 403)
+        self.assertNotIn("+12025550123", self.client.get("/conta").get_data(as_text=True))
+
+    def test_public_stylesheet_skips_account_lookup_even_while_logged_in(self):
+        self.signup()
+        with patch("accounts.get_db", side_effect=AssertionError("CSS consultou o cadastro")):
+            with self.client.get("/static/site.css") as stylesheet:
+                self.assertEqual(stylesheet.status_code, 200)
+                self.assertNotIn("Cookie", stylesheet.vary)
 
     def test_limit_survives_switch_of_identifier_and_expires(self):
         self.signup()

@@ -1,6 +1,6 @@
 """Estudos bíblicos privados. Uma pergunta passa por quatro etapas:
 
-1. Conferimos a conta, a assinatura e o consentimento no servidor.
+1. Conferimos a conta, o aceite e o direito a uma pergunta gratuita ou licenciada.
 2. Buscamos passagens do acervo e lemos a parte recente da conversa.
 3. Enviamos apenas esse material à API da OpenAI.
 4. Salvamos pergunta e resposta juntas, para manter um histórico consistente.
@@ -12,6 +12,8 @@ import secrets
 import time
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
 from flask import (
@@ -20,7 +22,7 @@ from flask import (
 )
 
 from accounts import admin_required, login_required
-from billing import has_subscription
+from billing import has_study_license
 from core import get_db
 from corpus import random_verse, search_passages, verse_by_id
 from study_format import study_markdown
@@ -35,6 +37,14 @@ STREAM_TYPE = "application/x-ndjson"  # Cada linha é um documento JSON completo
 CONSENT_VERSION = "2026-11-23-contexto-2"
 CONTEXT_PAIRS = 12
 CONTEXT_CHARACTERS = 32000
+FREE_PROMPTS = 5
+STUDY_TIMEZONE = ZoneInfo("America/Sao_Paulo")
+# Usamos a mesma definição de vaga ocupada para exibir o saldo e para
+# reservar. LEFT JOIN mantém também as respostas já concluídas, sem chat_id.
+FREE_USAGE_SQL = """SELECT count(*) FROM study_free_prompts p
+    LEFT JOIN study_chats c ON c.id=p.chat_id
+    WHERE p.user_id=? AND p.month=? AND (p.chat_id IS NULL OR
+        (c.pending_token=p.reservation AND c.lease_until>=?))"""
 DEFAULT_PROMPT = (
     "Você é um guia de estudos bíblicos em português brasileiro. Explique o contexto literário "
     "e histórico em linguagem acolhedora. Diferencie o texto, sua interpretação e as tradições "
@@ -75,14 +85,45 @@ def init_study(db):
             token TEXT NOT NULL, question TEXT NOT NULL, answer TEXT NOT NULL, sources TEXT NOT NULL,
             UNIQUE(chat_id, token)
         );
+        -- Na falta de cache, o índice já entrega os últimos pares em ordem
+        -- e a consulta pode parar assim que preencher a janela de contexto.
+        CREATE INDEX IF NOT EXISTS study_turn_order ON study_turns(chat_id,id);
         -- Um registro chave/valor por conversa. A chave é o ID do chat e o
         -- valor contém apenas as falas recentes que cabem na próxima consulta.
         CREATE TABLE IF NOT EXISTS study_cache (
             chat_id INTEGER PRIMARY KEY REFERENCES study_chats(id) ON DELETE CASCADE,
             value TEXT NOT NULL, expires INTEGER NOT NULL
         );
+        -- Durante uma resposta, chat_id aponta para a conversa. Ao concluir,
+        -- desvinculamos a conversa e conservamos apenas o uso da franquia.
+        -- Excluir um chat cancela suas reservas e preserva o total já usado.
+        CREATE TABLE IF NOT EXISTS study_free_prompts (
+            reservation TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            month TEXT NOT NULL,
+            chat_id INTEGER UNIQUE REFERENCES study_chats(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS study_free_month ON study_free_prompts(user_id,month);
+        -- A cada novo mês em que o leitor usar a franquia, os usos antigos
+        -- deixam de ser necessários. O gatilho evita uma ida extra ao Turso.
+        CREATE TRIGGER IF NOT EXISTS forget_finished_free_months
+        AFTER INSERT ON study_free_prompts BEGIN
+            DELETE FROM study_free_prompts WHERE user_id=NEW.user_id
+              AND month<NEW.month AND chat_id IS NULL;
+        END;
     """)
     db.execute("INSERT OR IGNORE INTO study_config VALUES(1, ?, 0.5)", (DEFAULT_PROMPT,))
+
+
+def _quota_month(timestamp):
+    """Uma pergunta iniciada perto da meia-noite pertence ao mês em São Paulo."""
+    return datetime.fromtimestamp(timestamp, STUDY_TIMEZONE).strftime("%Y-%m")
+
+
+def _free_remaining(db, owner, now):
+    """Conta respostas salvas e vagas em uso. Uma reserva vencida libera a vaga."""
+    row = db.execute(FREE_USAGE_SQL, (owner, _quota_month(now), now)).fetchone()
+    return max(0, FREE_PROMPTS - row[0])
 
 
 def _consented(db):
@@ -119,9 +160,12 @@ def _compose(verse, chat=None, draft=None, error=None, status=200):
             turns.append({**dict(row), "sources": json.loads(row["sources"])})
     if draft is None:
         draft = "" if turns else f"Quero estudar {verse['reference']}. Qual é o contexto desta passagem?"
+    remaining = None
+    if not g.user["disabled"] and not has_study_license(db, g.user["id"]):
+        remaining = _free_remaining(db, g.user["id"], int(time.time()))
     return render_template(
         "study_chat.html", verse=verse, chat=chat, turns=turns, draft=draft, error=error,
-        active=not g.user["disabled"] and has_subscription(db, g.user["id"]),
+        active=not g.user["disabled"] and remaining != 0, remaining=remaining, free_limit=FREE_PROMPTS,
         consented=_consented(db), token=secrets.token_hex(16), chats=_chats(db, g.user["id"]),
     ), status
 
@@ -129,14 +173,18 @@ def _compose(verse, chat=None, draft=None, error=None, status=200):
 @bp.get("/estudo")
 def index():
     """O menu Estudo retoma a conversa. Os links do leitor iniciam no verso escolhido."""
-    if g.user and not g.user["disabled"] and has_subscription(get_db(), g.user["id"]):
+    if g.user and not g.user["disabled"]:
         recent = get_db().execute("""SELECT id FROM study_chats WHERE user_id=?
                                      ORDER BY updated_at DESC,id DESC LIMIT 1""", (g.user["id"],)).fetchone()
         if recent:
             return redirect(url_for("study.chat", chat_id=recent["id"]))
+    # O menu também funciona antes de qualquer leitura NFC. Se a passagem
+    # anterior saiu do acervo ou é uma lacuna editorial, sorteamos uma legível.
     previous = session.get("last_verse")
     verse = verse_by_id(previous) if previous else None
-    return redirect(url_for("study.start", verse_id=(verse or random_verse())["id"]))
+    if not verse or not verse["text"]:
+        verse = random_verse()
+    return redirect(url_for("study.start", verse_id=verse["id"]))
 
 
 @bp.get("/estudar/<int:verse_id>")
@@ -145,8 +193,10 @@ def start(verse_id):
     verse = verse_by_id(verse_id)
     if not verse or not verse["text"]:
         abort(404)
-    if g.user is None or g.user["disabled"] or not has_subscription(get_db(), g.user["id"]):
+    if g.user is None:
         return redirect(url_for("billing.offer", verse_id=verse_id))
+    if g.user["disabled"]:
+        return redirect(url_for("study.history"))
     return _compose(verse)
 
 
@@ -243,6 +293,7 @@ class _TurnRequest:
     question: str
     verse_id: int
     reference: str
+    is_free: bool
 
 
 class _ClosedTurn(Exception):
@@ -253,35 +304,44 @@ def _check_reservation(db, turn):
     # A revogação do consentimento apaga os chats. A conferência antes da
     # chamada externa e a cada fragmento respeita essa exclusão e a suspensão.
     valid = db.execute("""SELECT 1 FROM study_chats c JOIN users u ON u.id=c.user_id
-                          WHERE c.id=? AND c.user_id=? AND c.pending_token=? AND u.disabled=0""",
-                       (turn.chat_id, turn.owner, turn.lease)).fetchone()
+                          WHERE c.id=? AND c.user_id=? AND c.pending_token=?
+                          AND c.lease_until>=? AND u.disabled=0""",
+                       (turn.chat_id, turn.owner, turn.lease, int(time.time()))).fetchone()
     if not valid:
         raise _ClosedTurn
 
 
-def _finish_event(chat_id, answer, sources):
+def _finish_event(chat_id, answer, sources, remaining):
     """Tanto o envio novo quanto sua repetição retornam o texto salvo e suas fontes."""
     linked = [{**source, "url": url_for("bible.locate", verse_id=source["id"]) if source.get("id") else None}
               for source in sources]
     return {"type": "done", "chat_id": chat_id, "url": url_for("study.chat", chat_id=chat_id),
-            "answer": answer, "sources": linked, "next_token": secrets.token_hex(16)}
+            "answer": answer, "sources": linked, "next_token": secrets.token_hex(16),
+            "free_remaining": remaining}
 
 
 def _store_turn(db, turn, answer, sources, history):
     """Confirma resposta, cache e liberação do chat em uma única transação."""
     with db:
+        # O relógio só é lido depois de obter a escrita. Outra aba pode ter
+        # reservado a última vaga enquanto esperávamos a liberação do banco.
+        db.execute("BEGIN IMMEDIATE")
         # Se outra aba excluiu o chat ou uma nova tentativa assumiu a reserva,
         # não há mais um destino válido para esta resposta.
+        timestamp = int(time.time())
         updated = db.execute("""UPDATE study_chats SET pending_token=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP
-                                WHERE id=? AND user_id=? AND pending_token=?""",
-                             (turn.chat_id, turn.owner, turn.lease))
+                                WHERE id=? AND user_id=? AND pending_token=? AND lease_until>=?
+                                AND EXISTS (SELECT 1 FROM users WHERE id=study_chats.user_id AND disabled=0)""",
+                             (turn.chat_id, turn.owner, turn.lease, timestamp))
         if not updated.rowcount:
             return False
         db.execute("INSERT INTO study_turns(chat_id,token,question,answer,sources) VALUES(?,?,?,?,?)",
                    (turn.chat_id, turn.token, turn.question, answer, json.dumps(sources, ensure_ascii=False)))
+        if turn.is_free:
+            # A gravação da resposta e a cobrança de uma vaga confirmam juntas.
+            db.execute("UPDATE study_free_prompts SET chat_id=NULL WHERE reservation=?", (turn.lease,))
         # Uma entrada por conversa, com validade de quinze minutos. O histórico
         # completo continua disponível quando o cache ultrapassa 128 entradas.
-        timestamp = int(time.time())
         db.execute("DELETE FROM study_cache WHERE expires<=?", (timestamp,))
         db.execute("INSERT OR REPLACE INTO study_cache VALUES(?,?,?)",
                    (turn.chat_id, json.dumps(_window(history+[[turn.question, answer]]), ensure_ascii=False), timestamp+900))
@@ -338,8 +398,12 @@ def _turn_events(turn, streaming):
                 _check_reservation(db, turn)
                 if time.monotonic() >= next_renewal:
                     with db:
-                        db.execute("UPDATE study_chats SET lease_until=? WHERE id=? AND pending_token=?",
-                                   (int(time.time())+120, turn.chat_id, turn.lease))
+                        db.execute("BEGIN IMMEDIATE")
+                        now = int(time.time())
+                        refreshed = db.execute("""UPDATE study_chats SET lease_until=? WHERE id=?
+                            AND pending_token=? AND lease_until>=?""", (now+120, turn.chat_id, turn.lease, now))
+                        if not refreshed.rowcount:
+                            raise _ClosedTurn
                     next_renewal = time.monotonic() + 30
                 pieces.append(piece)
                 if streaming:
@@ -351,7 +415,8 @@ def _turn_events(turn, streaming):
         saved = _store_turn(db, turn, answer, sources, history)
         if not saved:
             raise _ClosedTurn
-        final = _finish_event(turn.chat_id, answer, sources)
+        remaining = _free_remaining(db, turn.owner, int(time.time())) if turn.is_free else None
+        final = _finish_event(turn.chat_id, answer, sources, remaining)
     except _ClosedTurn:
         final = {"type": "error", "status": 409, "message": "A conversa foi encerrada durante o envio."}
     except (requests.RequestException, RuntimeError, KeyError, TypeError, IndexError, ValueError) as exc:
@@ -366,6 +431,9 @@ def _turn_events(turn, streaming):
             with db:
                 db.execute("UPDATE study_chats SET pending_token=NULL,lease_until=NULL WHERE id=? AND pending_token=?",
                            (turn.chat_id, turn.lease))
+                if turn.is_free:
+                    db.execute("DELETE FROM study_free_prompts WHERE reservation=? AND chat_id=?",
+                               (turn.lease, turn.chat_id))
     yield final
 
 
@@ -397,11 +465,6 @@ def send():
     verse = verse_by_id(verse_id) if verse_id else None
     if not verse or not verse["text"]:
         abort(404)
-    if not has_subscription(db, owner):
-        offer = url_for("billing.offer", verse_id=verse_id)
-        if streaming:
-            return jsonify(message="Seu estudo requer uma assinatura ativa.", url=offer), 403
-        return redirect(offer)
     question = request.form.get("question", "").strip()
     token = request.form.get("token", "")
     if len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
@@ -410,7 +473,6 @@ def send():
         if streaming:
             return jsonify(message="Escreva uma pergunta com até 3.000 caracteres."), 400
         return _compose(verse, existing, question[:3000], "Escreva uma pergunta com até 3.000 caracteres.", 400)
-    now = int(time.time())
     # O token público identifica o clique. A reserva privada identifica esta
     # execução específica, mesmo quando uma tentativa expirada é repetida.
     lease = secrets.token_hex(16)
@@ -418,6 +480,7 @@ def send():
         # A reserva serializa dois cliques simultâneos. A concessão expira se
         # o servidor for interrompido antes de terminar a chamada externa.
         db.execute("BEGIN IMMEDIATE")
+        now = int(time.time())
         if not _consented(db):
             if request.form.get("consent") != "on":
                 if streaming:
@@ -435,6 +498,7 @@ def send():
             chat_id = original["id"]
         previous = db.execute("SELECT question,answer,sources FROM study_turns WHERE chat_id=? AND token=?",
                               (chat_id, token)).fetchone()
+        is_free = not has_study_license(db, owner)
         if previous:
             if previous["question"] != question:
                 abort(409, description="Este envio já pertence a outra pergunta.")
@@ -444,7 +508,8 @@ def send():
                 return _stream_response([
                     {"type": "start", "chat_id": chat_id, "url": url_for("study.chat", chat_id=chat_id),
                      "reference": verse["reference"]},
-                    _finish_event(chat_id, previous["answer"], json.loads(previous["sources"])),
+                    _finish_event(chat_id, previous["answer"], json.loads(previous["sources"]),
+                                  _free_remaining(db, owner, now) if is_free else None),
                 ])
             return redirect(url_for("study.chat", chat_id=chat_id))
         claim = db.execute("""UPDATE study_chats SET pending_token=?, lease_until=?
@@ -454,7 +519,24 @@ def send():
             if streaming:
                 return jsonify(message="Uma resposta já está em andamento nesta conversa."), 409
             abort(409, description="Uma resposta já está em andamento nesta conversa.")
-    turn = _TurnRequest(chat_id, owner, lease, token, question, verse_id, verse["reference"])
+        if is_free:
+            # O saldo é compartilhado entre todos os chats deste leitor. Tanto
+            # a contagem quanto a reserva usam um único comando no Turso. Uma
+            # antiga reserva expirada no mesmo chat pode dar lugar a esta.
+            month = _quota_month(now)
+            reserved = db.execute(f"""INSERT INTO study_free_prompts(reservation,user_id,month,chat_id)
+                SELECT ?,?,?,? WHERE ({FREE_USAGE_SQL}) < ?
+                ON CONFLICT(chat_id) DO UPDATE SET reservation=excluded.reservation, month=excluded.month""",
+                (lease, owner, month, chat_id, owner, month, now, FREE_PROMPTS))
+            if not reserved.rowcount:
+                db.rollback()  # Inclui qualquer chat vazio criado por esta tentativa.
+                offer = url_for("billing.offer", verse_id=verse_id)
+                message = "As cinco perguntas grátis deste mês já foram usadas ou estão em andamento."
+                if streaming:
+                    return jsonify(message=message, url=offer, free_remaining=0), 429
+                flash(message)
+                return redirect(offer, code=303)
+    turn = _TurnRequest(chat_id, owner, lease, token, question, verse_id, verse["reference"], is_free)
     events = _turn_events(turn, streaming)
     if streaming:
         return _stream_response(events)
@@ -491,7 +573,7 @@ def delete_chat(chat_id):
                             (owner,)).fetchone()
         if latest:
             target = url_for("study.chat", chat_id=latest["id"])
-        elif not g.user["disabled"] and has_subscription(db, owner):
+        elif not g.user["disabled"]:
             target = url_for("study.start", verse_id=removed["verse_id"])
         else:
             target = url_for("study.history")

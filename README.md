@@ -43,7 +43,9 @@ O banco público `data/biblia.sqlite3` acompanha o projeto. A edição BPM do eB
 
 A API recebe a pergunta, as passagens e até doze pares recentes de mensagens, limitados a 32 mil caracteres de histórico. O cache chave/valor local guarda uma janela por conversa por 15 minutos e comporta até 128 conversas. Se a entrada expirar, o site remonta o contexto a partir do histórico privado. A configuração da OpenAI usa `gpt-4.1-mini` e `store=false`. O painel altera a temperatura e a mensagem de sistema nas consultas seguintes. O histórico completo pertence à conta e pode ser apagado, inclusive quando a assinatura termina.
 
-O Flask repassa à tela os fragmentos de texto enviados pela OpenAI. Os títulos e destaques recebem formatação durante a escrita e quando a conversa é reaberta. O servidor grava a pergunta e a resposta juntas após a conclusão. O menu **Estudo guiado** retoma a conversa mais recente do assinante. **Estudar com a IA**, dentro da Bíblia, abre um rascunho sobre a passagem selecionada. No celular, o botão **Abrir conversas** mostra o histórico lateral.
+O Flask repassa à tela os fragmentos de texto enviados pela OpenAI. Os títulos e destaques recebem formatação durante a escrita e quando a conversa é reaberta. O servidor grava a pergunta e a resposta juntas após a conclusão. O menu **Estudo guiado** retoma a conversa mais recente do leitor. **Estudar com a IA**, dentro da Bíblia, abre um rascunho sobre a passagem selecionada. No celular, o botão **Abrir conversas** mostra o histórico lateral.
+
+Cada conta gratuita pode concluir cinco perguntas de estudo por mês, somando todas as conversas. A franquia renova no primeiro dia do mês, no horário de São Paulo. Falhas e respostas interrompidas antes da conclusão liberam a vaga. Apagar uma conversa preserva a contagem daquele mês. Uma assinatura ativa ou licença manual dá acesso ao estudo além dessa franquia.
 
 Em **Navegar até o versículo**, o leitor abre o capítulo no ponto da passagem. A Bíblia exibe duas páginas no computador e uma no celular. Use as setas, o índice de livros ou um gesto lateral no celular para navegar. Após entrar, cada perfil pode marcar favoritos na própria página e ativar o histórico de leitura na **Biblioteca**. O favorito de um sorteio feito durante aquela sessão mantém o horário original.
 
@@ -55,7 +57,9 @@ Para guardar uma frase, entre na conta, selecione as palavras impressas e use **
 
 ## Configurar a entrada e o acesso ao painel
 
-**Usuário e senha.** O cadastro em `/cadastro` funciona sem serviços externos. A pessoa escolhe um nome de usuário e uma senha de 12 a 128 caracteres. Pode entrar com o nome ou o e-mail e trocar a senha em **Minha conta** usando a senha atual. A troca encerra as demais sessões desse login. O site ainda não envia e-mails de recuperação. Cadastros por métodos diferentes têm perfis separados, mesmo quando o e-mail coincide.
+**Usuário e senha.** O cadastro em `/cadastro` funciona sem serviços externos. A pessoa informa e-mail e celular e escolhe um nome de usuário e uma senha de 12 a 128 caracteres. Pode entrar com o nome ou o e-mail e trocar a senha em **Minha conta** usando a senha atual. A troca encerra as demais sessões desse login. O site ainda não envia e-mails de recuperação. Cadastros por métodos diferentes têm perfis separados, mesmo quando o e-mail coincide.
+
+O celular também é solicitado ao concluir o cadastro por provedor externo. Contas anteriores completam esse campo na próxima entrada. O proprietário encontra o celular junto ao nome e e-mail no painel de contas.
 
 **Facebook Login.** Em Meta for Developers, adicione o caso de uso de autenticação com Facebook, configure o domínio e registre o retorno exato `https://bibliadebolso.com/auth/facebook/callback` (ou o endereço HTTPS real do deploy). Informe a URL pública da política de privacidade e use `/privacidade#contato` como página de instruções de exclusão. Configure `FACEBOOK_APP_ID` e `FACEBOOK_APP_SECRET` no ambiente do servidor. Em modo de desenvolvimento, teste com uma pessoa que tenha função no aplicativo Meta. Para liberar o acesso público, conclua as etapas aplicáveis no painel da Meta. [Documentação do fluxo de login](https://developers.facebook.com/documentation/facebook-login/guides/advanced/manual-flow).
 
@@ -65,6 +69,7 @@ Para guardar uma frase, entre na conta, selecione as palavras impressas e use **
 2. Coloque o identificador em `GOOGLE_CLIENT_ID` e o segredo em `GOOGLE_CLIENT_SECRET`. Em modo de testes do Google, inclua sua conta entre os usuários permitidos.
 3. Cadastre-se em `/cadastro`, entre em **Minha conta**, copie o identificador Google exibido ali e configure `OWNER_GOOGLE_SUB`. Após reiniciar, essa identidade terá acesso a `/admin`. O cadastro inicial por si só não concede administração.
 4. Em **Configurar agente**, edite a instrução de sistema e a temperatura. Em **Checkout e vendas**, configure e publique a oferta.
+5. Em **Contas**, abra a licença da pessoa. Conceda o acesso com uma data final opcional, altere a validade ou revogue a concessão. A licença vale no ambiente selecionado (teste ou produção). Use o checkout com cartão de teste quando quiser exercitar também o registro de uma venda e sua fatura.
 
 ## Configurar a assinatura na Stripe
 

@@ -1,0 +1,5 @@
+{% macro phone_field(value='') -%}
+  <label>Celular com DDD<input name="phone" type="tel" autocomplete="tel" inputmode="tel"
+    maxlength="32" value="{{ value or '' }}" placeholder="(11) 99999-9999" aria-describedby="phone-hint" required></label>
+  <small id="phone-hint">Usado para atendimento da sua conta. Para números de fora do Brasil, inclua + e o código do país.</small>
+{%- endmacro %}

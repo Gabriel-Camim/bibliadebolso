@@ -6,6 +6,7 @@ enquanto o cadastro e os aceites ficam no banco da aplicação.
 """
 
 import os
+import re
 import secrets
 from functools import wraps
 from urllib.parse import unquote
@@ -18,6 +19,7 @@ from flask import (
 )
 from requests.exceptions import RequestException
 from joserfc.errors import JoseError
+import phonenumbers
 
 from core import get_db
 
@@ -26,8 +28,29 @@ bp = Blueprint("accounts", __name__)
 
 # Ao publicar uma alteração material, o operador muda a versão. Na próxima
 # entrada, o site pede que a pessoa leia os novos documentos antes de continuar.
-POLICY_VERSION = "2026-11-24"
+POLICY_VERSION = "2026-11-24.2"
 PAGE_SIZE = 25
+PHONE_HINT = "Informe um celular com DDD. Para outros países, comece com + e o código do país."
+
+
+def normalized_mobile(value):
+    """Confere o plano de numeração e grava uma forma única, como +5511998765432."""
+    value = (value or "").strip()
+    # O analisador também entende ramais, letras e texto livre. No cadastro
+    # aceitamos apenas um número e os separadores comuns de um campo telefônico.
+    if not re.fullmatch(r"\+?[0-9() .-]{7,32}", value):
+        return None
+    try:
+        parsed = phonenumbers.parse(value, "BR")
+    except phonenumbers.NumberParseException:
+        return None
+    # Em alguns países, um número válido de celular usa os mesmos prefixos
+    # dos fixos. A validação do formato não comprova a posse da linha.
+    if phonenumbers.number_type(parsed) not in (
+        phonenumbers.PhoneNumberType.MOBILE, phonenumbers.PhoneNumberType.FIXED_LINE_OR_MOBILE
+    ):
+        return None
+    return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
 
 def _setting(name):
@@ -44,6 +67,7 @@ def init_accounts(db):
             auth_provider TEXT NOT NULL DEFAULT 'google',
             email TEXT NOT NULL,
             name TEXT NOT NULL,
+            phone_e164 TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             disabled INTEGER NOT NULL DEFAULT 0 CHECK(disabled IN (0, 1))
         );
@@ -71,8 +95,12 @@ def init_accounts(db):
     # A migração preserva os IDs usados por anotações, faturas e conversas.
     with db:
         db.execute("BEGIN IMMEDIATE")
-        if "auth_provider" not in {row[1] for row in db.execute("PRAGMA table_info(users)")}:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
+        if "auth_provider" not in columns:
             db.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT 'google'")
+        if "phone_e164" not in columns:
+            # NULL identifica os cadastros anteriores à coleta de celular.
+            db.execute("ALTER TABLE users ADD COLUMN phone_e164 TEXT")
 
 
 @bp.record_once
@@ -134,11 +162,36 @@ def _is_owner(user):
 def load_account():
     """Revalida a conta no banco mesmo que o navegador traga uma sessão antiga."""
     g.user = None
+    # Entregamos esses recursos sem tocar no cookie de autenticação. Assim o
+    # cache público de um arquivo estático pode servir todos os visitantes.
+    if request.endpoint in {"static", "health", "billing.webhook"}:
+        return
     user_id = session.get("user_id")
-    if user_id is not None:
-        g.user = get_db().execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        if g.user is None:
-            session.pop("user_id", None)
+    if user_id is None:
+        return
+    db = get_db()
+    if "password_version" in session:
+        # Um único acesso ao banco remoto lê a conta e valida a versão da
+        # senha. Uma troca de senha invalida imediatamente as sessões antigas.
+        g.user = db.execute("""SELECT u.* FROM users u JOIN password_credentials p ON p.user_id=u.id
+                               WHERE u.id=? AND u.auth_provider='password' AND p.version=?""",
+                            (user_id, session["password_version"])).fetchone()
+    else:
+        g.user = db.execute("SELECT * FROM users WHERE id=? AND auth_provider!='password'", (user_id,)).fetchone()
+    if g.user is None:
+        _renew_session()
+        return
+    if not g.user["phone_e164"] and request.endpoint and request.endpoint not in {
+        # Mesmo quem prefere encerrar a conta pode consultar a política,
+        # gerenciar a cobrança e apagar os dados já fornecidos.
+        "accounts.phone", "accounts.profile", "accounts.delete_account", "accounts.logout",
+        "accounts.login", "accounts.signup", "accounts.google_callback",
+        "facebook_auth.login", "facebook_auth.signup", "facebook_auth.callback",
+        "password_auth.login", "password_auth.signup", "password_auth.change_password",
+        "billing.portal", "information", "cookies",
+    }:
+        destination = request.full_path.rstrip("?") if request.method == "GET" else "/conta"
+        return redirect(url_for("accounts.phone", next=_safe_destination(destination)), code=303)
 
 
 @bp.app_context_processor
@@ -158,7 +211,7 @@ def login_required(view):
             next_url = request.full_path.rstrip("?") if request.method == "GET" else "/conta"
             return redirect(url_for("accounts.login", next=next_url))
         if user["disabled"] and request.endpoint not in {
-            "accounts.profile", "accounts.delete_account", "billing.portal", "password_auth.change_password",
+            "accounts.profile", "accounts.phone", "accounts.delete_account", "billing.portal", "password_auth.change_password",
             # Mesmo após suspensão, o titular pode ler/apagar dados antigos
             # e revogar o consentimento. O envio de perguntas tem outra rota.
             "study.history", "study.chat", "study.delete_chat", "study.revoke",
@@ -196,12 +249,16 @@ def _access_page(mode):
         flash("Leia os documentos e marque o aceite para criar a conta.")
         return render_template("account_access.html", signup=True, next_url=destination,
                                google_ready=True), 400
+    phone = normalized_mobile(request.form.get("phone")) if signup else None
+    if signup and not phone:
+        flash(PHONE_HINT)
+        return redirect(url_for("accounts.signup", metodo="google", next=destination), code=303)
 
     # Vinculamos o aceite e o destino à tentativa de login. O valor aleatório
     # também é verificado pelo Authlib na volta do Google (proteção CSRF).
     state = secrets.token_urlsafe(32)
     session["google_flow"] = {
-        "state": state, "next": destination, "policy": POLICY_VERSION if signup else None,
+        "state": state, "next": destination, "policy": POLICY_VERSION if signup else None, "phone": phone,
     }
     public_url = _setting("PUBLIC_BASE_URL").rstrip("/") or "http://localhost:5000"
     callback = public_url + url_for("accounts.google_callback")
@@ -256,10 +313,10 @@ def google_callback():
     if str(identity["sub"]).startswith(("local:", "facebook:")):
         abort(403, description="O identificador recebido não é válido para uma conta Google.")
     return complete_social_login("google", identity["sub"], email, display_name,
-                                 flow.get("policy"), destination)
+                                 flow.get("policy"), destination, flow.get("phone"))
 
 
-def complete_social_login(provider, subject_key, email, display_name, accepted_policy, destination):
+def complete_social_login(provider, subject_key, email, display_name, accepted_policy, destination, phone=None):
     """Conclui um callback validado. A identidade é do provedor, nunca do e-mail."""
     db = get_db()
     # A transação une cadastro e aceite. Duas abas não criam duas contas.
@@ -272,18 +329,23 @@ def complete_social_login(provider, subject_key, email, display_name, accepted_p
                 "SELECT 1 FROM account_consents WHERE user_id = ? AND version = ?",
                 (user["id"], POLICY_VERSION),
             ).fetchone()
-            if not accepted:
+            if not accepted and (user is None or user["phone_e164"]):
                 flash("Para continuar, leia e aceite os documentos do cadastro.")
                 return redirect(url_for("accounts.signup", metodo=provider, next=destination))
         if user is None:
+            # Uma tentativa OAuth aberta antes da atualização ainda pode
+            # voltar. O novo cadastro só é gravado com o celular válido.
+            if not phone:
+                flash(PHONE_HINT)
+                return redirect(url_for("accounts.signup", metodo=provider, next=destination))
             user_id = db.execute(
-                "INSERT INTO users (auth_provider, google_sub, email, name) VALUES (?, ?, ?, ?)",
-                (provider, subject_key, email, display_name),
+                "INSERT INTO users (auth_provider, google_sub, email, name, phone_e164) VALUES (?, ?, ?, ?, ?)",
+                (provider, subject_key, email, display_name, phone),
             ).lastrowid
         else:
             user_id = user["id"]
-            db.execute("UPDATE users SET email = ?, name = ? WHERE id = ?",
-                       (email, display_name, user_id))
+            db.execute("UPDATE users SET email=?,name=?,phone_e164=COALESCE(phone_e164,?) WHERE id=?",
+                       (email, display_name, phone, user_id))
         if accepted_policy == POLICY_VERSION:
             db.execute("INSERT OR IGNORE INTO account_consents (user_id, version) VALUES (?, ?)",
                        (user_id, POLICY_VERSION))
@@ -292,6 +354,8 @@ def complete_social_login(provider, subject_key, email, display_name, accepted_p
     # associar o navegador ao cadastro; o formulário seguinte recebe novo CSRF.
     _renew_session()
     session["user_id"] = user_id
+    if user and not (user["phone_e164"] or phone):
+        return redirect(url_for("accounts.phone", next=destination))
     if user and user["disabled"]:
         flash("Seus estudos estão suspensos. Você ainda pode gerenciar a assinatura e a conta.")
         return redirect(url_for("accounts.profile"))
@@ -303,6 +367,32 @@ def logout():
     """Sai deste navegador. A aplicação principal valida o CSRF do formulário."""
     _renew_session()
     return redirect("/")
+
+
+@bp.route("/conta/celular", methods=["GET", "POST"])
+@login_required
+def phone():
+    """Completa o cadastro antigo ou corrige o celular do próprio titular."""
+    user = current_user()
+    destination = _safe_destination(request.values.get("next"))
+    # Nunca retornamos a esta mesma tela depois de completar os dados.
+    if destination.split("?", 1)[0] == request.path:
+        destination = url_for("accounts.profile")
+    completing = not user["phone_e164"]
+    if request.method == "GET":
+        return render_template("account_phone.html", user=user, completing=completing, next_url=destination)
+    number = normalized_mobile(request.form.get("phone"))
+    if not number or (completing and request.form.get("accept_policies") != "yes"):
+        flash(PHONE_HINT if not number else "Leia e aceite os documentos para concluir o cadastro.")
+        return render_template("account_phone.html", user=user, completing=completing, next_url=destination), 400
+    db = get_db()
+    with db:
+        db.execute("UPDATE users SET phone_e164=? WHERE id=?", (number, user["id"]))
+        if completing:
+            db.execute("INSERT OR IGNORE INTO account_consents(user_id,version) VALUES(?,?)",
+                       (user["id"], POLICY_VERSION))
+    flash("Celular salvo.", "toast")
+    return redirect(destination, code=303)
 
 
 @bp.get("/conta")
@@ -354,7 +444,7 @@ def delete_account():
 @admin_required
 def admin_home():
     """Mostra totais e uma página de cadastros por vez, sem abrir conversas."""
-    from billing import billing_metrics
+    from billing import admin_license_status, billing_metrics
 
     db = get_db()
     totals = db.execute(
@@ -375,6 +465,7 @@ def admin_home():
     return render_template(
         "admin_home.html", totals=totals, created=created, sales=billing_metrics(db),
         users=users, page=page, pages=pages, search=search, count=count,
+        licenses=admin_license_status(db, users),
     )
 
 

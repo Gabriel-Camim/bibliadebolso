@@ -142,11 +142,11 @@ class BibleBrowserFlow(TestCase):
             db = get_db()
             with db:
                 user_id = db.execute(
-                    "INSERT INTO users(google_sub,email,name) VALUES(?,?,?)",
+                    "INSERT INTO users(google_sub,email,name,phone_e164) VALUES(?,?,?,'+5511987654321')",
                     ("teste-local", "teste@example.test", "Leitor")
                 ).lastrowid
                 second_id = db.execute(
-                    "INSERT INTO users(google_sub,email,name) VALUES(?,?,?)",
+                    "INSERT INTO users(google_sub,email,name,phone_e164) VALUES(?,?,?,'+5511987654321')",
                     ("outro-leitor", "outro@example.test", "Outro leitor")
                 ).lastrowid
         with self.client.session_transaction() as session:

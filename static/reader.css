@@ -11,11 +11,11 @@ body[data-view="reader"] .main-shell {margin-top:clamp(1.5rem,3vw,3rem);min-heig
 .passage blockquote {font:500 var(--reading-size,clamp(2rem,2.85vw,3.25rem))/1.23 var(--reading-face,var(--serif));letter-spacing:-.035em;margin:clamp(1.6rem,3.2vw,3rem) 0 1rem;text-wrap:pretty;overflow-wrap:anywhere}
 .reference {display:flex;align-items:center;gap:.6rem;font:italic 1.2rem/1.4 var(--serif);color:#74613d;margin:0}
 .reference::before {content:"";width:1.15rem;height:1px;background:#b79c6a}
-.reader-actions,.passage-links,.passage-links :is(a,button),.folio-note,.folio-note a,.folio-note button {display:flex;align-items:center}
+.reader-actions,.passage-links,.passage-links :is(a,button) {display:flex;align-items:center}
 .reader-actions {gap:.6rem;margin-top:clamp(1.45rem,2.6vw,2.6rem);flex-wrap:wrap}
 .passage-links {flex-wrap:wrap;gap:0 1rem;margin-top:.48rem}
-.passage-links :is(a,button),.folio-note a,.folio-note button {min-height:40px;gap:.42rem;padding:.18rem 0;background:transparent;text-decoration:none;color:#555b49;font-size:.865rem;line-height:1.4}
-.passage-links :is(a,button):hover,.folio-note a:hover,.folio-note button:hover {text-decoration:underline}
+.passage-links :is(a,button) {min-height:40px;gap:.42rem;padding:.18rem 0;background:transparent;text-decoration:none;color:#555b49;font-size:.865rem;line-height:1.4}
+.passage-links :is(a,button):hover {text-decoration:underline}
 [data-favorite-button][aria-pressed="true"] svg {fill:#a88a48;stroke:#695b37}
 #draw-error:not(:empty) {margin-top:.6rem;color:#884427}
 .illustration {position:relative;overflow:hidden;isolation:isolate;align-self:stretch;margin:clamp(.65rem,1.3vw,1.15rem);margin-left:0;min-height:clamp(25rem,38vw,34rem);border-radius:2px 5px 5px 2px;background:#d8c397}
@@ -42,8 +42,6 @@ body[data-view="reader"] .main-shell {margin-top:clamp(1.5rem,3vw,3rem);min-heig
 @keyframes lamb-step {50% {transform:translateY(-3px) rotate(-2.1deg)}}
 @keyframes lamb-hop {50% {transform:translateY(-16px) rotate(-5deg)}}
 @keyframes ink-arrives {from {opacity:.15;transform:translateY(5px)} to {opacity:1;transform:none}}
-.folio-note {justify-content:space-between;gap:.7rem;margin:.85rem .1rem 0}
-.folio-note a,.folio-note button {color:#626653;font-size:.83rem}
 @media(max-width:57rem) {
   .passage {padding:1.65rem}
   .illustration {min-height:23rem}
@@ -62,5 +60,4 @@ body[data-view="reader"] .main-shell {margin-top:clamp(1.5rem,3vw,3rem);min-heig
   .passage {align-self:stretch;padding:1.5rem 1.25rem 1.05rem}
   .passage blockquote {font-size:var(--reading-size,clamp(1.65rem,6vw,2.25rem));margin:1.05rem 0 .75rem}
   .reader-actions {margin-top:1.3rem}
-  .folio-note {flex-wrap:wrap}
 }

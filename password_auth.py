@@ -12,7 +12,7 @@ import sqlite3
 from time import time
 from uuid import uuid4
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import TooManyRequests
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -127,19 +127,6 @@ def _start_session(user_id, version):
     session["password_version"] = version
 
 
-@bp.before_app_request
-def verify_session_version():
-    # O carregador de contas do blueprint accounts roda antes deste. Conferir
-    # a versão em cada acesso também funciona após reiniciar o site.
-    user = accounts.current_user()
-    if user is None or user["auth_provider"] != "password":
-        return
-    record = get_db().execute("SELECT version FROM password_credentials WHERE user_id=?", (user["id"],)).fetchone()
-    if record is None or session.get("password_version") != record["version"]:
-        accounts._renew_session()
-        g.user = None
-
-
 @bp.post("/auth/senha/cadastro")
 def signup():
     """Cria usuário, credencial e aceite juntos. Basta o leitor ter uma sessão CSRF."""
@@ -150,6 +137,7 @@ def signup():
     username = request.form.get("username", "").strip()
     email = request.form.get("email", "").strip()
     email_key = _email_key(email)
+    phone = accounts.normalized_mobile(request.form.get("phone"))
     password = request.form.get("password", "")
     if request.form.get("accept_policies") != "yes":
         message = "Leia e aceite os termos e a política de privacidade para criar a conta."
@@ -157,6 +145,8 @@ def signup():
         message = "Use um nome de usuário de 3 a 32 caracteres. Comece com uma letra ou número. Você também pode usar ponto, hífen e sublinhado."
     elif not email_key:
         message = "Confira o endereço de e-mail informado."
+    elif not phone:
+        message = accounts.PHONE_HINT
     elif not 12 <= len(password) <= 128:
         message = "Crie uma senha de 12 a 128 caracteres."
     else:
@@ -171,9 +161,9 @@ def signup():
     db = get_db()
     try:
         with db:
-            user_id = db.execute("""INSERT INTO users(google_sub,auth_provider,email,name)
-                                    VALUES(?,'password',?,?)""",
-                                 (f"local:{uuid4().hex}", email, display_name)).lastrowid
+            user_id = db.execute("""INSERT INTO users(google_sub,auth_provider,email,name,phone_e164)
+                                    VALUES(?,'password',?,?,?)""",
+                                 (f"local:{uuid4().hex}", email, display_name, phone)).lastrowid
             db.execute("""INSERT INTO password_credentials(user_id,username,email_key,password_hash)
                           VALUES(?,?,?,?)""", (user_id, username, email_key, hashed))
             db.execute("INSERT INTO account_consents(user_id,version) VALUES(?,?)", (user_id, accounts.POLICY_VERSION))
@@ -200,7 +190,7 @@ def login():
         column, key = "username", identifier.lower() if USERNAME.fullmatch(identifier) else ""
     # Só as duas constantes acima entram no SQL. A entrada da pessoa é sempre
     # um parâmetro. A mesma credencial tem um único limite, mesmo usando o alias.
-    user = db.execute(f"""SELECT p.user_id,p.password_hash,p.version,u.disabled
+    user = db.execute(f"""SELECT p.user_id,p.password_hash,p.version,u.disabled,u.phone_e164
                          FROM password_credentials p JOIN users u ON u.id=p.user_id
                          WHERE p.{column}=? AND u.auth_provider='password'""", (key,)).fetchone()
     account_bucket = _bucket("login-account", f"id:{user['user_id']}" if user else f"key:{key}")
@@ -217,10 +207,12 @@ def login():
         if request.form.get("accept_policies") == "yes":
             db.execute("INSERT OR IGNORE INTO account_consents(user_id,version) VALUES(?,?)",
                        (user["user_id"], accounts.POLICY_VERSION))
-        elif not db.execute("SELECT 1 FROM account_consents WHERE user_id=? AND version=?",
+        elif user["phone_e164"] and not db.execute("SELECT 1 FROM account_consents WHERE user_id=? AND version=?",
                             (user["user_id"], accounts.POLICY_VERSION)).fetchone():
             return _return_to("accounts.login", "Leia e aceite os documentos atualizados para continuar.", destination, aceite=1)
     _start_session(user["user_id"], user["version"])
+    if not user["phone_e164"]:
+        return redirect(url_for("accounts.phone", next=destination), code=303)
     if user["disabled"]:
         flash("Os estudos desta conta estão suspensos. Você pode gerenciar a conta e a assinatura.")
         return redirect(url_for("accounts.profile"), code=303)

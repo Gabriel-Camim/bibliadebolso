@@ -45,7 +45,8 @@ class AccountAccessTest(unittest.TestCase):
                          side_effect=lambda callback, state: redirect("/google?state=" + state)),
             patch.object(google, "authorize_access_token", return_value={"userinfo": claims}),
         ):
-            response = self.client.post(path, data={"next": destination, "accept_policies": "yes"})
+            response = self.client.post(path, data={"next": destination, "accept_policies": "yes",
+                                                    "phone": "(11) 98765-4321"})
             state = parse_qs(urlsplit(response.location).query)["state"][0]
             return self.client.get("/auth/google/callback", query_string={"code": "teste", "state": state})
 
@@ -67,6 +68,7 @@ class AccountAccessTest(unittest.TestCase):
             self.assertEqual(session.get("cookie_choice"), "essential")
             self.assertEqual(session.get("last_verse"), 7)
         self.assertEqual(self.google_return("leitor", path="/entrar").location, "/conta")
+        self.assertEqual(self.db.execute("SELECT phone_e164 FROM users").fetchone()[0], "+5511987654321")
         self.assertEqual(self.db.execute("SELECT created FROM account_totals").fetchone()[0], 1)
 
     def test_admin_checks_google_subject_and_suspension(self):
@@ -87,11 +89,28 @@ class AccountAccessTest(unittest.TestCase):
         google = self.app.extensions["accounts_google"].google
         metadata = {"authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth"}
         with patch.object(google, "load_server_metadata", return_value=metadata):
-            response = self.client.post("/entrar")
+            missing = self.client.post("/cadastro", data={"accept_policies": "yes", "phone": ""})
+            self.assertEqual(urlsplit(missing.location).path, "/cadastro")
+            response = self.client.post("/cadastro", data={"accept_policies": "yes", "phone": "(11) 98765-4321"})
         params = parse_qs(urlsplit(response.location).query)
         self.assertEqual(params["redirect_uri"], ["https://exemplo.invalid/auth/google/callback"])
         self.assertEqual(params["code_challenge_method"], ["S256"])
         self.assertTrue(params["nonce"] and params["state"])
+        self.assertNotIn("98765", response.location)
+
+    def test_existing_google_user_completes_phone_before_returning_to_study(self):
+        with self.db:
+            self.db.execute("""INSERT INTO users(google_sub,email,name)
+                               VALUES('antigo','antigo@example.invalid','Perfil antigo')""")
+        destination = "/estudo?verse_id=7"
+        reply = self.google_return("antigo", path="/entrar", destination=destination)
+        self.assertEqual(urlsplit(reply.location).path, "/conta/celular")
+        self.assertEqual(parse_qs(urlsplit(reply.location).query)["next"], [destination])
+        saved = self.client.post("/conta/celular", data={"phone":"11 98765-4321", "accept_policies":"yes",
+                                                         "next":destination})
+        self.assertEqual(saved.location, destination)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+        self.assertEqual(self.db.execute("SELECT phone_e164 FROM users").fetchone()[0], "+5511987654321")
 
     def test_upgrade_keeps_legacy_google_identity_and_private_foreign_keys(self):
         # Este é o formato de um banco criado quando só existia login Google.
@@ -110,6 +129,7 @@ class AccountAccessTest(unittest.TestCase):
         accounts.init_accounts(legacy)
         accounts.init_accounts(legacy)
         user = legacy.execute("SELECT users.* FROM saved JOIN users ON users.id=saved.owner").fetchone()
+        self.assertIsNone(user["phone_e164"])
         self.assertEqual((user["id"], user["auth_provider"], user["google_sub"]), (7, "google", "dono"))
         with self.app.app_context():
             self.assertTrue(accounts._is_owner(user))

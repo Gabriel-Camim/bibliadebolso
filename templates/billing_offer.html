@@ -27,14 +27,22 @@
             <input type="hidden" name="revision" value="{{ offer.revision }}">
             <input type="hidden" name="offer_mode" value="{{ 'live' if live else 'test' }}">
             {% if verse_id %}<input type="hidden" name="verse_id" value="{{ verse_id }}">{% endif %}
-            <button class="button primary">Assinar estudo guiado</button>
+            <button class="button primary ai-attention">Assinar estudo guiado</button>
           </form>
         {% else %}
-          <a class="button primary" href="{{ url_for('accounts.login', next=url_for('billing.offer', verse_id=verse_id)) }}">Entrar para assinar</a>
+          <a class="button primary ai-attention" href="{{ url_for('accounts.login', next=url_for('billing.offer', verse_id=verse_id)) }}">Entrar para assinar</a>
         {% endif %}
       {% else %}
         <p class="billing-status">As assinaturas estão em preparação. A leitura de versículos está disponível gratuitamente.</p>
         <a class="button secondary" href="/">Continuar a leitura</a>
+      {% endif %}
+      {% set study_url = url_for('study.start', verse_id=verse_id) if verse_id else url_for('study.index') %}
+      {% if g.user %}
+        <a class="billing-back" href="{{ study_url }}">Abrir meu estudo com IA</a>
+      {% else %}
+        <p class="billing-fine">Com sua conta, você pode fazer cinco perguntas gratuitas por mês.</p>
+        <a class="billing-back" href="{{ url_for('accounts.login', next=study_url) }}">Entrar para experimentar</a>
+        <a class="billing-back" href="{{ url_for('accounts.signup', next=study_url) }}">Criar conta gratuita</a>
       {% endif %}
     </div>
     <aside class="offer-example" aria-label="Exemplo de conversa com o guia de estudos">

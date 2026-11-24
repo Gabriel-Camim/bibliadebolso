@@ -17,7 +17,7 @@ class PersonalLibrary(TestCase):
         with self.app.app_context():
             db = get_db()
             with db:
-                db.executemany("INSERT INTO users(google_sub,email,name) VALUES(?,?,?)",
+                db.executemany("INSERT INTO users(google_sub,email,name,phone_e164) VALUES(?,?,?,'+5511987654321')",
                                [("a", "a@example.invalid", "A"), ("b", "b@example.invalid", "B")])
         self.first = self.client_for(1)
         self.second = self.client_for(2)

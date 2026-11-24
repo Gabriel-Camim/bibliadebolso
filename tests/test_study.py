@@ -1,5 +1,7 @@
 """Exercita o fluxo de um assinante sem usar créditos nem dados de uma conta real."""
 import json
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -7,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from app import create_app
 from core import get_db
-from study import _context, _window
+from study import FREE_PROMPTS, _context, _free_remaining, _quota_month, _window
 
 
 class StudyFlow(TestCase):
@@ -19,11 +21,11 @@ class StudyFlow(TestCase):
         with self.app.app_context():
             db = get_db()
             with db:
-                db.executemany("INSERT INTO users(google_sub,email,name) VALUES(?,?,?)",
+                db.executemany("INSERT INTO users(google_sub,email,name,phone_e164) VALUES(?,?,?,'+5511987654321')",
                                [("dono", "dono@example.test", "Dono"), ("leitor", "leitor@example.test", "Leitor")])
         # Nos testes da conversa, a confirmação financeira é substituída
         # por uma decisão local. A própria cobrança tem testes separados.
-        self.paid = self.enterContext(patch("study.has_subscription", return_value=True))
+        self.paid = self.enterContext(patch("study.has_study_license", return_value=True))
         self.api = self.enterContext(patch("study.ask_openai", return_value="Consulte Gênesis 1:1."))
         self.login(1)
 
@@ -84,6 +86,19 @@ class StudyFlow(TestCase):
         self.assertNotIn("<h3>O começo</h3>", draft)
         self.login(2)
         self.assertNotEqual(self.client.get("/estudo").location, finished.location)
+
+    def test_study_menu_uses_last_readable_verse_or_draws_a_new_one(self):
+        self.paid.return_value = False
+        with patch("study.random_verse", return_value={"id": 2}) as draw:
+            self.assertEqual(self.client.get("/estudo").location, "/estudar/2")
+            with self.client.session_transaction() as session:
+                session["last_verse"] = 1
+            self.assertEqual(self.client.get("/estudo").location, "/estudar/1")
+            with self.client.session_transaction() as session:
+                session["last_verse"] = 99999999
+            self.assertEqual(self.client.get("/estudo").location, "/estudar/2")
+            self.assertEqual(draw.call_count, 2)
+        self.api.assert_not_called()
 
     def test_closed_connection_releases_generation_and_preserves_complete_history(self):
         # Fechamos a resposta logo após a primeira parte. Isso simula o WSGI
@@ -166,11 +181,71 @@ class StudyFlow(TestCase):
         self.paid.return_value = False
         self.assertEqual(self.client.get("/estudo/historico").status_code, 200)
         self.assertEqual(self.client.get(first.location).status_code, 200)
-        self.assertIn("/assinatura", self.send(chat_id=1).location)
+        # Ao terminar a licença, o leitor também pode usar as perguntas grátis.
+        self.assertEqual(self.send(chat_id=1, token="3"*32).location, first.location)
         self.assertEqual(self.client.post("/estudo/revogar", data={"csrf_token":"protecao"}).status_code, 302)
         with self.app.app_context():
             for table in ("study_chats", "study_turns", "study_cache", "study_consents"):
                 self.assertEqual(get_db().execute("SELECT count(*) FROM "+table).fetchone()[0], 0)
+
+    def test_monthly_grant_retries_deletion_and_licenses(self):
+        self.paid.return_value = False
+        self.assertIn("data-free-allowance", self.client.get("/estudar/1").get_data(as_text=True))
+        for i in range(1, FREE_PROMPTS + 1):
+            args = {"chat_id": 1, "token": str(i)*32} if i > 1 else {"consent":"on"}
+            self.assertEqual(self.send(**args).status_code, 302)
+        # A resposta do último pedido pode ter se perdido na rede. Mesmo sem
+        # saldo o cliente recupera esse resultado, sem nova geração da OpenAI.
+        retry = self.stream(chat_id=1, token="5"*32)
+        self.assertEqual([json.loads(line) for line in retry.response][-1]["free_remaining"], 0)
+        retry.close()
+        denied = self.stream(token="6"*32)
+        self.assertEqual((denied.status_code, denied.json["url"]), (429, "/assinatura?verse_id=1"))
+        self.assertEqual(self.api.call_count, 5)
+        self.assertEqual(self.client.get("/estudo/1").status_code, 200)
+        self.assertEqual(self.client.post("/estudo/1/excluir", data={"csrf_token":"protecao"}).status_code, 302)
+        self.assertEqual(self.send(token="7"*32).status_code, 303)
+        with self.app.app_context():
+            db = get_db()
+            self.assertEqual(db.execute("SELECT count(*) FROM study_chats").fetchone()[0], 0)
+            self.assertEqual(_free_remaining(db, 1, int(time.time())), 0)
+            self.assertEqual(_free_remaining(db, 2, int(time.time())), 5)
+        self.paid.return_value = True
+        self.assertEqual(self.send(token="8"*32).status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(get_db().execute("SELECT count(*) FROM study_free_prompts").fetchone()[0], 5)
+
+    def test_free_slot_reserved_during_stream_and_returned_on_disconnect(self):
+        self.paid.return_value = False
+        for i in range(1, 5):
+            self.assertEqual(self.send(token=str(i)*32, consent="on").status_code, 302)
+        with patch("study.stream_openai", return_value=iter(["Trecho"])):
+            reply = self.stream(token="5"*32)
+            chunks = iter(reply.response)
+            self.assertEqual(json.loads(next(chunks))["type"], "start")
+            self.assertEqual(json.loads(next(chunks))["type"], "delta")
+            self.assertEqual(self.stream(token="6"*32).status_code, 429)
+            reply.close()
+        self.api.side_effect = RuntimeError("openai_indisponivel")
+        self.assertEqual(self.send(token="7"*32).status_code, 503)
+        self.api.side_effect = None
+        self.assertEqual(self.send(token="7"*32).status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(get_db().execute("SELECT count(*) FROM study_free_prompts").fetchone()[0], 5)
+
+    def test_free_month_changes_at_midnight_in_sao_paulo_and_ignores_stale_leases(self):
+        before = int(datetime(2026, 12, 1, 2, 59, 59, tzinfo=timezone.utc).timestamp())
+        self.assertEqual((_quota_month(before), _quota_month(before+1)), ("2026-11", "2026-12"))
+        self.paid.return_value = False
+        with patch("study.time.time", return_value=before):
+            self.assertEqual(self.send(consent="on").status_code, 302)
+        with self.app.app_context():
+            db = get_db()
+            with db:
+                db.execute("UPDATE study_chats SET pending_token='parou',lease_until=? WHERE id=1", (before-1,))
+                db.execute("INSERT INTO study_free_prompts VALUES('parou',1,'2026-11',1)")
+            self.assertEqual(_free_remaining(db, 1, before), 4)
+            self.assertEqual(_free_remaining(db, 1, before+1), 5)
 
     def test_settings_affect_next_answer_and_owner_only(self):
         self.assertEqual(self.client.get("/admin/agente").status_code, 200)

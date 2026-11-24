@@ -64,6 +64,12 @@
       </div>
     </div>
     <div class="compose-dock">
+      {% if not g.user.disabled %}
+      <div class="study-allowance" data-free-allowance {% if remaining is none %}hidden{% endif %}>
+        <span role="status"><strong data-remaining>{{ remaining if remaining is not none else '' }}</strong> de {{ free_limit }} perguntas grátis disponíveis neste mês.<small data-renewal {% if remaining != 0 %}hidden{% endif %}> A franquia renova no dia 1º.</small></span>
+        <a class="study-subscribe ai-attention" href="{{ url_for('billing.offer', verse_id=verse.id) }}">Assinar o plano de IA {{ glyph('external',13) }}</a>
+      </div>
+      {% endif %}
       {% if active %}
       <form method="post" action="{{ url_for('study.send') }}" id="study-form" class="chat-composer">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="token" value="{{ token }}">
@@ -80,7 +86,7 @@
           <button class="chat-send" type="submit" aria-label="Enviar pergunta" title="Enviar pergunta">{{ glyph('send',20) }}</button>
         </div>
       </form>
-      {% else %}<p class="expired-chat">Você pode reler as mensagens salvas. <a href="{{ url_for('billing.offer', verse_id=verse.id) }}">Ver assinatura para conversar</a>.</p>{% endif %}
+      {% elif g.user.disabled %}<p class="expired-chat">O envio de perguntas está suspenso. Você pode reler as conversas salvas.</p>{% endif %}
       <p class="guide-disclosure"><span id="study-status" role="status"></span><a href="/sobre">A IA pode errar. Confira as passagens.</a></p>
     </div>
   </section>

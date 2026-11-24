@@ -12,6 +12,7 @@
   const transcript = page.querySelector("#chat-transcript");
   const scrollport = page.querySelector("#chat-scrollport");
   const prompts = page.querySelector("#chat-prompts");
+  const allowance = page.querySelector("[data-free-allowance]");
   const passage = page.querySelector(".passage-disclosure");
   let sending = false;
   let controller;
@@ -132,6 +133,19 @@
     question.style.height = Math.min(question.scrollHeight + 2, 120) + "px";
   }
 
+  // O servidor calcula o saldo entre todos os chats da conta. Não subtraímos
+  // nada no navegador ao clicar, pois uma resposta interrompida libera a vaga.
+  function updateAllowance(remaining) {
+    if (!allowance || remaining === undefined) return;
+    allowance.hidden = remaining === null;
+    if (Number.isInteger(remaining)) {
+      allowance.querySelector("[data-remaining]").textContent = String(remaining);
+      allowance.querySelector("[data-renewal]").hidden = remaining !== 0;
+    }
+    if (form) form.hidden = remaining === 0;
+    if (prompts && remaining === 0) prompts.hidden = true;
+  }
+
   function setCurrent(id, url, title) {
     const cleanURL = localPath(url);
     if (!cleanURL || !Number.isInteger(id)) return;
@@ -179,7 +193,7 @@
     workspace.dataset.current = "";
     passage.open = true;
     workspace.querySelector("#study-status").textContent = "";
-    if (prompts) prompts.hidden = false;
+    if (prompts) prompts.hidden = Boolean(form?.hidden);
     scrollport.scrollTop = 0;
     setPose("le");
     history.replaceState(null, "", form ? workspace.dataset.fresh : workspace.dataset.history);
@@ -332,6 +346,7 @@
         if (type.includes("application/json")) {
           const problem = await response.json();
           notice = problem.message || notice;
+          updateAllowance(problem.free_remaining);
           const path = localPath(problem.url);
           if (path) {
             const action = element("a", "Continuar");
@@ -356,6 +371,7 @@
           if (!frame) frame = requestAnimationFrame(paint);
         } else if (chunk.type === "done") {
           done = true;
+          updateAllowance(chunk.free_remaining);
           text = chunk.answer ?? text;
           cancelAnimationFrame(frame); paint();
           indicator.remove();
@@ -375,7 +391,7 @@
       question.value = message;
       if (!errorBox.textContent) errorBox.textContent = failure.name === "TypeError" ? "Não foi possível conectar. Tente novamente." : failure.message;
       errorBox.hidden = false;
-      if (prompts && !transcript.childElementCount) prompts.hidden = false;
+      if (prompts && !transcript.childElementCount && !form.hidden) prompts.hidden = false;
       status.textContent = "";
     } finally {
       cancelAnimationFrame(frame);

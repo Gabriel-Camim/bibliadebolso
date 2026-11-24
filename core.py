@@ -32,6 +32,17 @@ def close_db(_error):
         db.close()
 
 
+def write_one(sql, parameters):
+    """Confirma uma instrução autônoma no banco ativo da requisição."""
+    db = get_db()
+    if db.in_transaction:
+        return db.execute(sql, parameters)
+    if current_app.config.get("DATABASE_BACKEND") == "turso":
+        return db.execute_atomic(sql, parameters)
+    with db:
+        return db.execute(sql, parameters)
+
+
 def csrf_token():
     """O navegador devolve este valor no formulário para confirmar sua origem."""
     if "_csrf" not in session:
@@ -52,10 +63,8 @@ def protect_forms():
 def record_reading(*, opened):
     """Soma totais por dia, sem persistir IP, identificador de tag ou lista de leitores."""
     today = datetime.now(timezone(timedelta(hours=-3))).date().isoformat()
-    db = get_db()
     # O incremento acontece dentro do banco para não perder contagens simultâneas.
-    with db:
-        db.execute("""
-            INSERT INTO daily_metrics(day, visits, verses) VALUES (?, ?, 1)
-            ON CONFLICT(day) DO UPDATE SET visits=visits+excluded.visits, verses=verses+1
-        """, (today, int(opened)))
+    write_one("""
+        INSERT INTO daily_metrics(day, visits, verses) VALUES (?, ?, 1)
+        ON CONFLICT(day) DO UPDATE SET visits=visits+excluded.visits, verses=verses+1
+    """, (today, int(opened)))

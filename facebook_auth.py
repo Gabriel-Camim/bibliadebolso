@@ -53,6 +53,10 @@ def _start(signup):
     if signup and request.form.get("accept_policies") != "yes":
         flash("Leia os documentos e marque o aceite para criar sua conta.")
         return redirect(back, code=303)
+    phone = accounts.normalized_mobile(request.form.get("phone")) if signup else None
+    if signup and not phone:
+        flash(accounts.PHONE_HINT)
+        return redirect(url_for("accounts.signup", metodo="facebook", next=destination), code=303)
 
     # Vinculamos o destino, a validade e o aceite ao navegador que iniciou a
     # tentativa. A Meta recebe apenas o valor aleatório e o callback fixo.
@@ -60,7 +64,7 @@ def _start(signup):
     # Se autorizado, o e-mail serve como contato, nunca como chave de acesso.
     state = secrets.token_urlsafe(32)
     session["facebook_flow"] = dict(state=state, started=int(time.time()), next=destination,
-                                    policy=accounts.POLICY_VERSION if signup else None)
+                                    policy=accounts.POLICY_VERSION if signup else None, phone=phone)
     params = urlencode(dict(client_id=accounts._setting("FACEBOOK_APP_ID"),
                             redirect_uri=_callback_url(), response_type="code", state=state,
                             scope="public_profile,email"))
@@ -136,4 +140,4 @@ def callback():
         flash("O Facebook não pôde confirmar a entrada. Tente novamente.")
         return redirect(back)
     return accounts.complete_social_login("facebook", subject, email, display_name,
-                                          flow["policy"], destination)
+                                          flow["policy"], destination, flow.get("phone"))

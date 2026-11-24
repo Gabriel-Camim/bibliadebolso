@@ -51,6 +51,30 @@ h2 {font-size:1.85rem;line-height:1.2;font-weight:500}
 .button:hover {background:#283222}
 .button.secondary {color:#3c4334;background:#fffdf6;border-color:#c6c8b6}
 .button.secondary:hover {background:#ebecdf}
+/* O halo segue a borda do botão sem cobrir o texto nem interceptar cliques.
+   No livro, a criação de uma nova barra de ações reinicia o percurso. */
+.ai-attention {position:relative; isolation:isolate}
+.ai-attention::before,.ai-attention::after {content:"";position:absolute;pointer-events:none}
+.ai-attention::before {
+  inset:-2px;border:1px solid #c6994a;border-radius:inherit;
+  box-shadow:0 0 8px 2px #d8a84675;opacity:0;
+  animation:study-halo 2.15s ease-out 2;
+}
+@keyframes study-halo {0%,100% {opacity:0} 20% {opacity:.9} 68% {opacity:.25}}
+@supports (offset-path:inset(0 round 8px)) {
+  .ai-attention::after {
+    inset:0 auto auto 0;width:7px;height:7px;border-radius:50%;opacity:0;
+    background:#fff5c7;box-shadow:0 0 3px 2px #f1c664,0 0 9px 3px #d6a4478c;
+    offset-path:inset(0 round 8px);animation:study-orbit 2.15s linear 2;
+  }
+}
+@keyframes study-orbit {0% {offset-distance:0;opacity:0} 7%,89% {opacity:1} 100% {offset-distance:100%;opacity:0}}
+@media (prefers-reduced-motion:reduce) {
+  /* Uma única volta suave preserva o sinal de estudo sem deslocar o botão
+     nem repetir o efeito para quem reduziu o movimento no sistema. */
+  .ai-attention::before,.ai-attention::after {animation-duration:3.6s;animation-iteration-count:1}
+  .ai-attention::after {box-shadow:0 0 4px 1px #d9b165}
+}
 .eyebrow,.edition {display:flex;align-items:center;gap:.55rem;font:650 .76rem/1.5 var(--sans);letter-spacing:.13em;color:#7f633c}
 .reader-intro {display:flex;align-items:end;justify-content:space-between;gap:1rem;margin-bottom:1.4rem}
 .reader-intro h1 {margin:0}

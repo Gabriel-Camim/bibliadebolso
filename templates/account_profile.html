@@ -4,7 +4,9 @@
 <section class="account-wrap">
   <div class="panel account-card">
     <h1>Minha conta</h1>
-    <p><strong>{{ user.name }}</strong>{% if user.email %}<br>{{ user.email }}{% endif %}</p>
+    <p><strong>{{ user.name }}</strong>{% if user.email %}<br>{{ user.email }}{% endif %}
+      <br>Celular · {{ user.phone_e164 or 'Pendente' }}
+      <a href="{{ url_for('accounts.phone') }}">{{ 'Editar' if user.phone_e164 else 'Informar celular' }}</a></p>
     {% if user.disabled %}<p role="status">O acesso aos estudos está suspenso.</p>{% endif %}
     <div class="account-actions">
       <a class="button secondary" href="{{ url_for('library.index') }}">Meus versículos favoritos</a>

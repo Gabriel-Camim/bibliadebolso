@@ -19,7 +19,7 @@ class BibleNotes(TestCase):
         with self.app.app_context():
             conn = get_db()
             with conn:
-                conn.executemany("INSERT INTO users(google_sub,email,name) VALUES(?,?,?)",
+                conn.executemany("INSERT INTO users(google_sub,email,name,phone_e164) VALUES(?,?,?,'+5511987654321')",
                                  [("1", "a@example.invalid", "A"), ("2", "b@example.invalid", "B")])
         self.a = self.client_for(1)
         self.b = self.client_for(2)
